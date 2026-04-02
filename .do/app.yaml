@@ -15,12 +15,12 @@ services:
       deploy_on_push: true
     source_dir: /
     build_command: if [ -n "$DATABASE_URL" ]; then npm run db:push; else echo "Skipping Prisma schema sync because DATABASE_URL is not set."; fi && npm run build
-    run_command: npm start
+    run_command: node .next/standalone/server.js
     http_port: 8080
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-1gb
     health_check:
-      http_path: /
+      http_path: /api/health
       initial_delay_seconds: 15
       period_seconds: 15
       timeout_seconds: 5
