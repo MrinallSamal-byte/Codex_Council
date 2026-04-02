@@ -9,33 +9,43 @@ const defaultExportStorageRoot =
     ? "/tmp/repocouncil/exports"
     : ".repocouncil/exports";
 
-const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
-  DATABASE_URL: z.string().min(1).optional(),
-  REDIS_URL: z.string().min(1).optional(),
-  OPENROUTER_API_KEY: z.string().min(1).optional(),
-  OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
-  REPO_STORAGE_ROOT: z.string().default(defaultRepoStorageRoot),
-  EXPORT_STORAGE_ROOT: z.string().default(defaultExportStorageRoot),
-  ANALYSIS_MAX_CONCURRENCY: z.coerce.number().int().min(1).default(1),
-  ASK_MAX_CONCURRENCY: z.coerce.number().int().min(1).default(1),
-  ASK_MAX_ACTIVE_AGENTS: z.coerce.number().int().min(1).max(6).default(2),
-  ASK_MAX_PARTICIPANTS: z.coerce.number().int().min(1).max(6).default(6),
-  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-  ENABLE_SEMGREP: z
-    .string()
-    .optional()
-    .transform((value) => value === "true"),
-  ENABLE_CODEQL: z
-    .string()
-    .optional()
-    .transform((value) => value === "true"),
-  DEMO_MODE: z
-    .string()
-    .optional()
-    .transform((value) => value !== "false"),
-});
+const envSchema = z
+  .object({
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    NEXT_PUBLIC_APP_URL: z.string().url().default("http://localhost:3000"),
+    DATABASE_URL: z.string().min(1).optional(),
+    REDIS_URL: z.string().min(1).optional(),
+    OPENROUTER_API_KEY: z.string().min(1).optional(),
+    OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
+    REPO_STORAGE_ROOT: z.string().default(defaultRepoStorageRoot),
+    EXPORT_STORAGE_ROOT: z.string().default(defaultExportStorageRoot),
+    ANALYSIS_MAX_CONCURRENCY: z.coerce.number().int().min(1).default(1),
+    ASK_MAX_CONCURRENCY: z.coerce.number().int().min(1).default(1),
+    ASK_MAX_ACTIVE_AGENTS: z.coerce.number().int().min(1).max(6).default(2),
+    ASK_MAX_PARTICIPANTS: z.coerce.number().int().min(1).max(6).default(6),
+    LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+    ENABLE_SEMGREP: z
+      .string()
+      .optional()
+      .transform((value) => value === "true"),
+    ENABLE_CODEQL: z
+      .string()
+      .optional()
+      .transform((value) => value === "true"),
+    DEMO_MODE: z
+      .string()
+      .optional()
+      .transform((value) => value !== "false"),
+  })
+  .superRefine((value, ctx) => {
+    if (value.ASK_MAX_ACTIVE_AGENTS > value.ASK_MAX_PARTICIPANTS) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "ASK_MAX_ACTIVE_AGENTS cannot be greater than ASK_MAX_PARTICIPANTS.",
+        path: ["ASK_MAX_ACTIVE_AGENTS"],
+      });
+    }
+  });
 
 export const env = envSchema.parse({
   NODE_ENV: process.env.NODE_ENV,

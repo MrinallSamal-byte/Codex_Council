@@ -1,7 +1,7 @@
-# RepoCouncil starter spec for DigitalOcean App Platform.
-# Update the repo/branch if you publish under a different name.
-# Set DATABASE_URL in App Platform as a secret with RUN_AND_BUILD_TIME scope.
-# Set OPENROUTER_API_KEY in App Platform if you want live model calls.
+# RepoCouncil App Platform spec.
+# This service deploys from the repo-root Dockerfile and relies on the container entrypoint
+# in deployment/scripts/start.sh for runtime preflight checks, schema sync, and startup.
+# Set DATABASE_URL and OPENROUTER_API_KEY as encrypted RUN_TIME variables in App Platform.
 
 name: repocouncil
 region: blr
@@ -13,22 +13,33 @@ services:
       repo: MrinallSamal-byte/Codex_Council
       branch: main
       deploy_on_push: true
+    dockerfile_path: Dockerfile
     source_dir: /
-    build_command: if [ -n "$DATABASE_URL" ]; then npm run db:push; else echo "Skipping Prisma schema sync because DATABASE_URL is not set."; fi && npm run build
-    run_command: node .next/standalone/server.js
-    http_port: 8080
+    http_port: 3000
     instance_count: 1
     instance_size_slug: apps-s-1vcpu-1gb
     health_check:
       http_path: /api/health
-      initial_delay_seconds: 15
+      initial_delay_seconds: 25
       period_seconds: 15
       timeout_seconds: 5
       success_threshold: 1
       failure_threshold: 3
     envs:
+      - key: NEXT_PUBLIC_APP_URL
+        value: ${APP_URL}
+        scope: RUN_TIME
+        type: general
       - key: NODE_ENV
         value: production
+        scope: RUN_TIME
+        type: general
+      - key: PORT
+        value: "3000"
+        scope: RUN_TIME
+        type: general
+      - key: HOSTNAME
+        value: 0.0.0.0
         scope: RUN_TIME
         type: general
       - key: DEMO_MODE
@@ -45,6 +56,34 @@ services:
         type: general
       - key: ANALYSIS_MAX_CONCURRENCY
         value: "1"
+        scope: RUN_TIME
+        type: general
+      - key: ASK_MAX_CONCURRENCY
+        value: "1"
+        scope: RUN_TIME
+        type: general
+      - key: ASK_MAX_ACTIVE_AGENTS
+        value: "2"
+        scope: RUN_TIME
+        type: general
+      - key: ASK_MAX_PARTICIPANTS
+        value: "6"
+        scope: RUN_TIME
+        type: general
+      - key: LOG_LEVEL
+        value: info
+        scope: RUN_TIME
+        type: general
+      - key: RUN_DB_PUSH_ON_START
+        value: "true"
+        scope: RUN_TIME
+        type: general
+      - key: DB_CONNECT_MAX_RETRIES
+        value: "10"
+        scope: RUN_TIME
+        type: general
+      - key: RECOVER_RUNNING_RUNS_ON_START
+        value: "true"
         scope: RUN_TIME
         type: general
       - key: NODE_OPTIONS

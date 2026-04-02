@@ -98,6 +98,38 @@ function buildRoundPlan(mode: AskMode, roles: AskAgentRole[]) {
   return rounds.filter((round) => round.roles.length > 0);
 }
 
+function buildPlannedRounds(mode: AskMode, roles: AskAgentRole[]) {
+  return buildRoundPlan(mode, roles).map((round, index) => ({
+    ...round,
+    roundIndex: index + 1,
+  }));
+}
+
+function resolveRemainingRounds(
+  rounds: Array<{ roundIndex: number; roundType: AskRoundType; roles: AskAgentRole[] }>,
+  existingTurns: AskTurn[],
+) {
+  return rounds
+    .map((round) => {
+      const completedRoles = new Set(
+        existingTurns
+          .filter(
+            (turn) =>
+              turn.status === "completed" &&
+              turn.roundIndex === round.roundIndex &&
+              turn.roundType === round.roundType,
+          )
+          .map((turn) => turn.role),
+      );
+
+      return {
+        ...round,
+        roles: round.roles.filter((role) => !completedRoles.has(role)),
+      };
+    })
+    .filter((round) => round.roles.length > 0);
+}
+
 function getRoleHeuristicAngle(role: AskAgentRole, taskType: CouncilTaskType) {
   const generic = {
     question: "Clarify what success looks like before committing to a path.",
@@ -389,10 +421,6 @@ function nextTurnIndex(bundle: AskSessionBundle | null) {
   return (bundle?.turns.at(-1)?.turnIndex ?? 0) + 1;
 }
 
-function nextRoundIndex(bundle: AskSessionBundle | null) {
-  return (bundle?.turns.at(-1)?.roundIndex ?? 0) + 1;
-}
-
 function buildCanonicalSummary(params: {
   session: AskSession;
   taskType: CouncilTaskType;
@@ -460,7 +488,8 @@ async function executeAskSession(sessionId: string) {
     requestedModel: session.requestedModel,
     requestedProvider: session.requestedProvider,
   });
-  const rounds = buildRoundPlan(executionPlan.normalizedMode, roles);
+  const plannedRounds = buildPlannedRounds(executionPlan.normalizedMode, roles);
+  const rounds = resolveRemainingRounds(plannedRounds, bundle.turns);
   const concurrency = Math.max(
     1,
     Math.min(
@@ -511,24 +540,21 @@ async function executeAskSession(sessionId: string) {
 
   const existingBundle = await storage.getAskSessionBundle(session.id);
   let currentTurnIndex = nextTurnIndex(existingBundle);
-  let currentRoundIndex = nextRoundIndex(existingBundle);
   const newTurns: AskTurn[] = [];
-  const totalRounds = rounds.length;
+  const totalRounds = plannedRounds.length;
 
   try {
-    for (let roundOffset = 0; roundOffset < rounds.length; roundOffset += 1) {
-      const round = rounds[roundOffset]!;
-
+    for (const round of rounds) {
       emitProgressEvent(session.id, {
         type: "ask.progress",
         sessionId: session.id,
         message: `${titleCase(round.roundType)} round in progress`,
-        percent: Math.round((roundOffset / (totalRounds + 1)) * 100),
+        percent: Math.round(((round.roundIndex - 1) / (totalRounds + 1)) * 100),
       });
       emitProgressEvent(session.id, {
         type: "ask.round.started",
         sessionId: session.id,
-        roundIndex: currentRoundIndex,
+        roundIndex: round.roundIndex,
         roundType: round.roundType,
         roles: round.roles,
       });
@@ -539,7 +565,7 @@ async function executeAskSession(sessionId: string) {
           id: randomUUID(),
           sessionId: session.id,
           role,
-          roundIndex: currentRoundIndex,
+          roundIndex: round.roundIndex,
           roundType: round.roundType,
           turnIndex: currentTurnIndex++,
           status: "running",
@@ -561,7 +587,7 @@ async function executeAskSession(sessionId: string) {
         const result = await runCouncilTurn({
           session: normalizedSession,
           role,
-          roundIndex: currentRoundIndex,
+          roundIndex: round.roundIndex,
           roundType: round.roundType,
           assignment,
           question: session.question,
@@ -591,8 +617,6 @@ async function executeAskSession(sessionId: string) {
           roundType: completedTurn.roundType,
         });
       });
-
-      currentRoundIndex += 1;
     }
 
     const latestBundle = await storage.getAskSessionBundle(session.id);
@@ -775,6 +799,41 @@ export async function continueAskSession(
             },
           },
         }),
+      })) ?? bundle.session;
+
+    void executeAskSession(updatedSession.id);
+    return updatedSession;
+  } catch (error) {
+    releaseAskSlot(sessionId);
+    throw error;
+  }
+}
+
+export async function resumeAskSession(sessionId: string) {
+  const storage = getStorageAdapter();
+  const bundle = await storage.getAskSessionBundle(sessionId);
+  if (!bundle) {
+    return null;
+  }
+
+  if (bundle.session.status === "completed" || bundle.session.status === "running") {
+    return bundle.session;
+  }
+
+  acquireAskSlot(sessionId);
+
+  try {
+    const updatedSession =
+      (await storage.updateAskSession(sessionId, {
+        ...bundle.session,
+        status: "pending",
+        completedAt: null,
+        metadata: {
+          ...bundle.session.metadata,
+          recoverable: true,
+          resumedAt: new Date().toISOString(),
+          resumeCount: Number(bundle.session.metadata.resumeCount ?? 0) + 1,
+        },
       })) ?? bundle.session;
 
     void executeAskSession(updatedSession.id);

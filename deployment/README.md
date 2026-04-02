@@ -1,8 +1,18 @@
 # DigitalOcean Deployment Guide
 
-This project is structured for a modest DigitalOcean Droplet first, with a future path to App Platform later.
+This project now supports both DigitalOcean App Platform and a modest self-managed Droplet. In both cases, the repo-root `Dockerfile` and `deployment/scripts/start.sh` are the source of truth for runtime preflight checks, schema sync, recovery, and process startup.
 
-## Recommended MVP server
+## Recommended footprints
+
+### App Platform
+
+- `apps-s-1vcpu-1gb` works for the current resource-aware Ask/Council defaults
+- keep `ANALYSIS_MAX_CONCURRENCY=1`
+- keep `ASK_MAX_CONCURRENCY=1`
+- keep `ASK_MAX_ACTIVE_AGENTS=2`
+- keep `ASK_MAX_PARTICIPANTS=6`
+
+### Droplet
 
 - 2 vCPU / 4 GB RAM Droplet for the first production deployment
 - Ubuntu 24.04 LTS
@@ -39,6 +49,9 @@ Optional but recommended:
 - `REPO_STORAGE_ROOT`
 - `EXPORT_STORAGE_ROOT`
 - `ANALYSIS_MAX_CONCURRENCY`
+- `ASK_MAX_CONCURRENCY`
+- `ASK_MAX_ACTIVE_AGENTS`
+- `ASK_MAX_PARTICIPANTS`
 - `NODE_OPTIONS`
 - `LOG_LEVEL`
 - `ENABLE_SEMGREP`
@@ -46,6 +59,32 @@ Optional but recommended:
 - `RUN_DB_PUSH_ON_START`
 - `DB_CONNECT_MAX_RETRIES`
 - `RECOVER_RUNNING_RUNS_ON_START`
+
+## App Platform workflow
+
+The included [`.do/app.yaml`](../.do/app.yaml) is configured for the current production path:
+
+- App Platform builds from the repo-root `Dockerfile`
+- the container listens on port `3000`
+- runtime startup goes through `deployment/scripts/start.sh`
+- health checks use `/api/health`
+- Ask/Council agent limits default to a staged, resource-aware profile
+
+Recommended App Platform setup:
+
+1. Create or update the app from [`.do/app.yaml`](../.do/app.yaml).
+2. Set these encrypted runtime variables in the App Platform UI or spec:
+   - `DATABASE_URL`
+   - `OPENROUTER_API_KEY` if you want live model calls instead of heuristic fallbacks
+3. Keep `NEXT_PUBLIC_APP_URL` bound to `${APP_URL}` in the spec so the deployed hostname stays accurate.
+4. If you need more throughput, scale instance size first, then raise Ask or analysis concurrency deliberately.
+
+Runtime behavior on App Platform:
+
+- `deployment/scripts/preflight.mjs` validates required env vars and Ask capacity knobs
+- `deployment/scripts/start.sh` runs `prisma db push --skip-generate` when `RUN_DB_PUSH_ON_START=true`
+- running or interrupted analyses are recovered on boot when `RECOVER_RUNNING_RUNS_ON_START=true`
+- Ask sessions persist through the database-backed storage layer, not just in memory
 
 ## Local container workflow
 
@@ -99,6 +138,9 @@ Set at minimum:
 - `DATABASE_URL=postgresql://...`
 - `DEMO_MODE=false`
 - `ANALYSIS_MAX_CONCURRENCY=1`
+- `ASK_MAX_CONCURRENCY=1`
+- `ASK_MAX_ACTIVE_AGENTS=2`
+- `ASK_MAX_PARTICIPANTS=6`
 - `NODE_OPTIONS=--max-old-space-size=768`
 - `RUN_DB_PUSH_ON_START=true`
 
@@ -189,6 +231,18 @@ Common causes:
 - invalid `NEXT_PUBLIC_APP_URL`
 - missing `DATABASE_URL` while `DEMO_MODE=false`
 - PostgreSQL not reachable from the Droplet
+- invalid Ask capacity config, such as `ASK_MAX_ACTIVE_AGENTS` being greater than `ASK_MAX_PARTICIPANTS`
+
+### App Platform deploy is healthy at build time but fails after release
+
+Check the runtime logs in App Platform rather than the build logs. A successful Docker build does not confirm the app passed preflight or schema sync.
+
+Common causes:
+
+- `NEXT_PUBLIC_APP_URL` not bound to the deployed hostname
+- `DATABASE_URL` missing or unreachable at runtime
+- `RUN_DB_PUSH_ON_START=true` with a database user that cannot update schema objects
+- health checks starting before the app has completed schema sync on a cold deploy
 
 ### Readiness fails
 

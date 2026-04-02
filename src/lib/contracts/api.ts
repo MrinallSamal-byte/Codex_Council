@@ -61,6 +61,11 @@ export const GetAskExportRequestSchema = z.object({
   download: z.boolean().default(false),
 });
 
+export const GetAnalysisExportRequestSchema = z.object({
+  format: z.enum(["markdown", "json", "csv", "mermaid", "pdf", "zip"]).default("markdown"),
+  download: z.boolean().default(false),
+});
+
 export const ProgressEventSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("analysis.started"),

@@ -16,6 +16,28 @@ function parseBoolean(value, defaultValue) {
   fail(`Expected a boolean-like value, received "${value}".`);
 }
 
+function parseInteger(name, fallback, options = {}) {
+  const { min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY } = options;
+  const rawValue = process.env[name] ?? String(fallback);
+  const value = Number(rawValue);
+
+  if (!Number.isInteger(value)) {
+    fail(`${name} must be an integer, received "${rawValue}".`);
+  }
+
+  if (value < min || value > max) {
+    const bounds =
+      Number.isFinite(min) && Number.isFinite(max)
+        ? `between ${min} and ${max}`
+        : Number.isFinite(min)
+          ? `greater than or equal to ${min}`
+          : `less than or equal to ${max}`;
+    fail(`${name} must be ${bounds}, received "${rawValue}".`);
+  }
+
+  return value;
+}
+
 function fail(message) {
   console.error(`[repocouncil:preflight] ${message}`);
   process.exit(1);
@@ -31,6 +53,13 @@ try {
   new URL(process.env.NEXT_PUBLIC_APP_URL);
 } catch {
   fail("NEXT_PUBLIC_APP_URL must be a valid absolute URL.");
+}
+
+const appUrl = new URL(process.env.NEXT_PUBLIC_APP_URL);
+if (process.env.NODE_ENV === "production" && ["localhost", "127.0.0.1"].includes(appUrl.hostname)) {
+  console.warn(
+    "[repocouncil:preflight] NEXT_PUBLIC_APP_URL still points at localhost. App Platform should usually bind this to ${APP_URL}.",
+  );
 }
 
 const demoMode = parseBoolean(process.env.DEMO_MODE, true);
@@ -60,14 +89,15 @@ for (const key of ["REPO_STORAGE_ROOT", "EXPORT_STORAGE_ROOT"]) {
   }
 }
 
-const concurrency = Number(process.env.ANALYSIS_MAX_CONCURRENCY ?? "1");
-if (!Number.isFinite(concurrency) || concurrency < 1) {
-  fail("ANALYSIS_MAX_CONCURRENCY must be a positive integer.");
-}
+const port = parseInteger("PORT", 3000, { min: 1, max: 65535 });
+const concurrency = parseInteger("ANALYSIS_MAX_CONCURRENCY", 1, { min: 1 });
+const askMaxConcurrency = parseInteger("ASK_MAX_CONCURRENCY", 1, { min: 1 });
+const askMaxActiveAgents = parseInteger("ASK_MAX_ACTIVE_AGENTS", 2, { min: 1, max: 6 });
+const askMaxParticipants = parseInteger("ASK_MAX_PARTICIPANTS", 6, { min: 1, max: 6 });
+const dbConnectMaxRetries = parseInteger("DB_CONNECT_MAX_RETRIES", 10, { min: 1 });
 
-const dbConnectMaxRetries = Number(process.env.DB_CONNECT_MAX_RETRIES ?? "10");
-if (!Number.isFinite(dbConnectMaxRetries) || dbConnectMaxRetries < 1) {
-  fail("DB_CONNECT_MAX_RETRIES must be a positive integer.");
+if (askMaxActiveAgents > askMaxParticipants) {
+  fail("ASK_MAX_ACTIVE_AGENTS cannot be greater than ASK_MAX_PARTICIPANTS.");
 }
 
 parseBoolean(process.env.RUN_DB_PUSH_ON_START, true);
@@ -84,10 +114,15 @@ console.log(
     {
       event: "runtime_preflight_ok",
       nodeEnv: process.env.NODE_ENV ?? "production",
+      appUrl: process.env.NEXT_PUBLIC_APP_URL,
       demoMode,
       databaseConfigured: Boolean(process.env.DATABASE_URL),
       redisConfigured: Boolean(process.env.REDIS_URL),
+      port,
       analysisMaxConcurrency: concurrency,
+      askMaxConcurrency,
+      askMaxActiveAgents,
+      askMaxParticipants,
       dbConnectMaxRetries,
       nodeOptions: process.env.NODE_OPTIONS ?? "",
     },

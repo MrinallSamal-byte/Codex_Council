@@ -14,7 +14,8 @@ export function ReportView({ initialBundle }: { initialBundle: AnalysisBundle })
     return null;
   }
 
-  const report = bundle.reports[0];
+  const report =
+    bundle.reports.find((artifact) => artifact.format === "markdown") ?? bundle.reports[0];
   return (
     <Card>
       <CardHeader>

@@ -17,9 +17,12 @@ export default async function ReportPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Link href={`/api/analysis/${bundle.run.id}/report?download=true`}>
+      <div className="flex justify-end gap-3">
+        <Link href={`/api/analysis/${bundle.run.id}/report?format=markdown&download=true`}>
           <Button variant="secondary">Export markdown report</Button>
+        </Link>
+        <Link href={`/api/analysis/${bundle.run.id}/report?format=zip&download=true`}>
+          <Button variant="secondary">Download ZIP bundle</Button>
         </Link>
       </div>
       <ReportView initialBundle={bundle} />

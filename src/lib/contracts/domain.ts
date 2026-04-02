@@ -347,7 +347,7 @@ export const ExportReportSchema = z.object({
   id: z.string(),
   analysisRunId: z.string(),
   title: z.string(),
-  format: z.enum(["markdown", "html", "json"]),
+  format: z.enum(["markdown", "html", "json", "csv", "mermaid", "pdf", "zip"]),
   content: z.string(),
   createdAt: z.string(),
 });

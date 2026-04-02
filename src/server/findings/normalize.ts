@@ -17,8 +17,10 @@ export function normalizeFindings(findings: Finding[]) {
       ...finding,
       confidence: clampNumber(finding.confidence, 0, 1),
       impactedAreas: Array.from(new Set(finding.impactedAreas)),
-      evidence: finding.evidence.filter(
-        (item) => item.filePath || item.note || item.toolName || item.findingId,
+      evidence: dedupeEvidence(
+        finding.evidence.filter(
+          (item) => item.filePath || item.note || item.toolName || item.findingId,
+        ),
       ),
       status: finding.status ?? "open",
     };
@@ -32,7 +34,7 @@ export function normalizeFindings(findings: Finding[]) {
     merged.set(normalized.id, {
       ...normalized,
       impactedAreas: Array.from(new Set([...existing.impactedAreas, ...normalized.impactedAreas])),
-      evidence: [...existing.evidence, ...normalized.evidence],
+      evidence: dedupeEvidence([...existing.evidence, ...normalized.evidence]),
       confidence: Math.max(existing.confidence, normalized.confidence),
       severity:
         severityRank[normalized.severity] > severityRank[existing.severity]
@@ -49,4 +51,10 @@ export function normalizeFindings(findings: Finding[]) {
     }
     return right.confidence - left.confidence;
   });
+}
+
+function dedupeEvidence(evidence: Finding["evidence"]) {
+  return Array.from(
+    new Map(evidence.map((item) => [JSON.stringify(item), item])).values(),
+  );
 }

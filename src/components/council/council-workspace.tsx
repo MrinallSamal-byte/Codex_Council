@@ -243,6 +243,31 @@ export function CouncilWorkspace({
     router.push(`/ask?sessionId=${data.session.id}`);
   }
 
+  async function handleResumeSession() {
+    if (!activeBundle?.session.id) {
+      return;
+    }
+
+    setError(null);
+    const response = await fetch(`/api/ask/sessions/${activeBundle.session.id}/resume`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      const data = (await response.json().catch(() => null)) as { error?: string } | null;
+      setError(data?.error ?? "Unable to resume the interrupted session.");
+      return;
+    }
+
+    const data = (await response.json()) as { session: AskSession };
+    replaceBundle({
+      ...(activeBundle ?? { turns: [], exports: [] }),
+      session: data.session,
+    });
+    setSessions((current) => [data.session, ...current.filter((item) => item.id !== data.session.id)]);
+    router.push(`/ask?sessionId=${data.session.id}`);
+  }
+
   return (
     <div className="space-y-6">
       <section className="overflow-hidden rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.16),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(251,191,36,0.12),_transparent_30%),linear-gradient(135deg,_rgba(2,6,23,0.96),_rgba(15,23,42,0.9))] p-7">
@@ -655,6 +680,19 @@ export function CouncilWorkspace({
                       </p>
                     </div>
                   </div>
+
+                  {activeBundle.session.status !== "completed" &&
+                  Boolean(activeBundle.session.metadata?.recoverable) ? (
+                    <div className="flex justify-end">
+                      <Button
+                        variant="secondary"
+                        disabled={isPending}
+                        onClick={() => startTransition(handleResumeSession)}
+                      >
+                        {isPending ? "Resuming..." : "Resume from latest turns"}
+                      </Button>
+                    </div>
+                  ) : null}
                 </>
               ) : (
                 <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center text-slate-400">

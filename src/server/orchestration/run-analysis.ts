@@ -9,7 +9,7 @@ import { runAnalyzerSuite } from "../analyzers";
 import { getStorageAdapter } from "../db";
 import { normalizeFindings } from "../findings/normalize";
 import { buildPatchPlans } from "../patches/planner";
-import { buildMarkdownReport, ensureMarkdownReportArtifact } from "../report/export";
+import { buildAnalysisExportArtifact, ensureMarkdownReportArtifact } from "../report/export";
 import { type ToolExecution } from "../db/storage";
 import { scopeFeatureIds, scopeFindingIds } from "./identity";
 import {
@@ -226,19 +226,15 @@ async function finalizeAnalysis(params: {
     throw new Error("Unable to hydrate completed analysis bundle");
   }
 
-  const report = {
-    id: `report_${params.run.id}`,
-    analysisRunId: params.run.id,
-    title: `${params.repository.name} analysis report`,
-    format: "markdown" as const,
-    content: buildMarkdownReport({
+  const report = await buildAnalysisExportArtifact(
+    {
       ...bundle,
       features: normalizedFeatures,
       findings: normalizedFindings,
       patches: patchPlans,
-    }),
-    createdAt: new Date().toISOString(),
-  };
+    },
+    "markdown",
+  );
   await storage.saveReport(params.run.id, report);
   try {
     await ensureMarkdownReportArtifact({

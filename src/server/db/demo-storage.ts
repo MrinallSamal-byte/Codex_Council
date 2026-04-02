@@ -41,6 +41,17 @@ function getMutableAskBundles() {
   return global.__repocouncil_demo_ask_bundles__;
 }
 
+function resetAnalysisArtifacts(bundle: AnalysisBundle) {
+  bundle.graph = { nodes: [], edges: [] };
+  bundle.turns = [];
+  bundle.findings = [];
+  bundle.features = [];
+  bundle.patches = [];
+  bundle.snapshots = [];
+  bundle.reports = [];
+  bundle.tools = [];
+}
+
 export class DemoStorageAdapter implements StorageAdapter {
   async listRepositories(): Promise<Repository[]> {
     return [getMutableBundle().repository];
@@ -56,6 +67,7 @@ export class DemoStorageAdapter implements StorageAdapter {
       createdAt: input.createdAt ?? new Date().toISOString(),
     };
     bundle.run.repositoryId = bundle.repository.id;
+    resetAnalysisArtifacts(bundle);
     return bundle.repository;
   }
 
@@ -68,6 +80,7 @@ export class DemoStorageAdapter implements StorageAdapter {
     input: Omit<AnalysisRun, "startedAt"> & { startedAt?: string },
   ): Promise<AnalysisRun> {
     const bundle = getMutableBundle();
+    resetAnalysisArtifacts(bundle);
     bundle.run = {
       ...bundle.run,
       ...input,
