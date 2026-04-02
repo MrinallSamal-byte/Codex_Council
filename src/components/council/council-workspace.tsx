@@ -108,11 +108,31 @@ export function CouncilWorkspace({
   );
   const [hideProcess, setHideProcess] = useState(activeBundle?.session.finalAnswerOnly ?? false);
   const [isPending, startTransition] = useTransition();
+  const executionPlan = activeBundle?.session.metadata.executionPlan as
+    | {
+        totalParticipants?: number;
+        activeAgents?: number;
+        staged?: boolean;
+      }
+    | undefined;
+  const plannedActiveAgents =
+    controls.mode === "normal" ? 1 : Math.min(Math.max(controls.agentCount, 2), maxActiveAgents);
+  const plannedTotalParticipants =
+    controls.mode === "normal" ? 1 : Math.max(controls.agentCount, 2);
+  const plannedStaged = plannedActiveAgents < plannedTotalParticipants;
 
   useEffect(() => {
     setControls(controlsFromSession(activeBundle?.session));
     setHideProcess(activeBundle?.session.finalAnswerOnly ?? false);
   }, [activeBundle?.session]);
+
+  useEffect(() => {
+    setSessions(initialSessions);
+  }, [initialSessions]);
+
+  useEffect(() => {
+    setHideProcess(controls.finalAnswerOnly);
+  }, [controls.finalAnswerOnly]);
 
   const groupedTurns = useMemo(() => {
     const groups = new Map<string, AskTurn[]>();
@@ -136,9 +156,15 @@ export function CouncilWorkspace({
 
   async function handleStartSession() {
     setError(null);
+    const trimmedQuestion = question.trim();
+
+    if (trimmedQuestion.length < 2) {
+      setError("Ask Mode needs a real question before the council can start.");
+      return;
+    }
 
     const payload = {
-      question,
+      question: trimmedQuestion,
       ...controls,
       requestedModel:
         controls.modelStrategy === "single" ? controls.requestedModel.trim() : undefined,
@@ -179,13 +205,20 @@ export function CouncilWorkspace({
     }
 
     setError(null);
+    const nextQuestion = (followUpQuestion || activeBundle.session.question).trim();
+
+    if (nextQuestion.length < 2) {
+      setError("The follow-up question is too short to rerun.");
+      return;
+    }
+
     const response = await fetch(`/api/ask/sessions/${activeBundle.session.id}/continue`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        question: followUpQuestion || activeBundle.session.question,
+        question: nextQuestion,
         ...controls,
         requestedModel:
           controls.modelStrategy === "single" ? controls.requestedModel.trim() : undefined,
@@ -403,13 +436,16 @@ export function CouncilWorkspace({
 
                 <div className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Deployment profile
+                    Planned execution
                   </p>
                   <p className="mt-2 text-sm text-slate-200">
-                    Up to {maxActiveAgents} active agent calls at once
+                    {plannedActiveAgents} active model call
+                    {plannedActiveAgents === 1 ? "" : "s"} for this run
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
-                    Larger councils stage turns automatically if resources are tight.
+                    {plannedStaged
+                      ? `${plannedTotalParticipants} participants will be staged on this deployment.`
+                      : "This run can execute without staging on this deployment."}
                   </p>
                 </div>
               </div>
@@ -584,6 +620,39 @@ export function CouncilWorkspace({
                         {Math.round(activeBundle.session.canonicalSummary.confidence * 100)}%
                       </p>
                       <p className="mt-2 text-xs text-slate-400">{progress.message}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        Session Mode
+                      </p>
+                      <p className="mt-3 text-sm font-medium text-white">
+                        {titleCase(activeBundle.session.mode)}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        Council Size
+                      </p>
+                      <p className="mt-3 text-sm font-medium text-white">
+                        {activeBundle.session.agentCount} participant
+                        {activeBundle.session.agentCount === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        Execution Plan
+                      </p>
+                      <p className="mt-3 text-sm font-medium text-white">
+                        {executionPlan?.activeAgents ?? activeBundle.session.maxActiveAgents} active at once
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {executionPlan?.staged
+                          ? "Staged execution on this deployment."
+                          : "Runs without staging on this deployment."}
+                      </p>
                     </div>
                   </div>
                 </>
@@ -767,8 +836,13 @@ export function CouncilWorkspace({
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Badge variant="secondary">{assignment.provider}</Badge>
                         <Badge variant="secondary">{assignment.model}</Badge>
+                        {executionPlan?.staged ? (
+                          <Badge variant="secondary">Staged</Badge>
+                        ) : null}
                         {activeBundle?.turns.some(
-                          (turn) => turn.role === assignment.role && turn.metadata?.heuristicFallback,
+                          (turn) =>
+                            turn.role === assignment.role &&
+                            (turn.metadata?.heuristicFallback || turn.metadata?.fallbackUsed),
                         ) ? (
                           <Badge variant="high">Fallback</Badge>
                         ) : null}
@@ -818,6 +892,11 @@ export function CouncilWorkspace({
                         <Badge variant="secondary">{titleCase(session.mode)}</Badge>
                         <Badge variant="secondary">{session.agentCount} agents</Badge>
                         <Badge variant="secondary">{titleCase(session.modelStrategy)}</Badge>
+                        {(
+                          session.metadata.executionPlan as { staged?: boolean } | undefined
+                        )?.staged ? (
+                          <Badge variant="secondary">Staged</Badge>
+                        ) : null}
                       </div>
                     </Link>
                   ))}

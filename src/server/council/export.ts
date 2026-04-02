@@ -159,6 +159,7 @@ export async function buildAskExportArtifact(
 ): Promise<AskExport> {
   const safeSlug = slugify(bundle.session.title) || bundle.session.id;
   const createdAt = new Date().toISOString();
+  const sourceUpdatedAt = bundle.session.updatedAt;
 
   if (format === "markdown") {
     return {
@@ -170,6 +171,7 @@ export async function buildAskExportArtifact(
       metadata: {
         filename: `${safeSlug}.md`,
         mimeType: "text/markdown; charset=utf-8",
+        sourceUpdatedAt,
       },
       createdAt,
     };
@@ -185,6 +187,7 @@ export async function buildAskExportArtifact(
       metadata: {
         filename: `${safeSlug}-transcript.md`,
         mimeType: "text/markdown; charset=utf-8",
+        sourceUpdatedAt,
       },
       createdAt,
     };
@@ -200,6 +203,7 @@ export async function buildAskExportArtifact(
       metadata: {
         filename: `${safeSlug}.json`,
         mimeType: "application/json; charset=utf-8",
+        sourceUpdatedAt,
       },
       createdAt,
     };
@@ -233,6 +237,7 @@ export async function buildAskExportArtifact(
         filename: `${safeSlug}.pdf`,
         mimeType: "application/pdf",
         encoding: "base64",
+        sourceUpdatedAt,
       },
       createdAt,
     };
@@ -260,9 +265,15 @@ export async function buildAskExportArtifact(
       filename: `${safeSlug}.zip`,
       mimeType: "application/zip",
       encoding: "base64",
+      sourceUpdatedAt,
     },
     createdAt,
   };
+}
+
+export function isAskExportArtifactStale(bundle: AskSessionBundle, artifact: AskExport) {
+  const sourceUpdatedAt = String(artifact.metadata.sourceUpdatedAt ?? "");
+  return sourceUpdatedAt !== bundle.session.updatedAt;
 }
 
 export function resolveAskArtifactPayload(artifact: AskExport) {

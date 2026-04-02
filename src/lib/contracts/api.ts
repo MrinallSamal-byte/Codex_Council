@@ -6,6 +6,7 @@ import {
   AnalysisBundleSchema,
   AnalysisStatusSchema,
   AskAgentAssignmentSchema,
+  AskExportFormatSchema,
   AskModeSchema,
   AskSessionBundleSchema,
   AskTurnSchema,
@@ -53,6 +54,11 @@ export const CreateAskSessionRequestSchema = z.object({
 
 export const ContinueAskSessionRequestSchema = CreateAskSessionRequestSchema.partial().extend({
   question: z.string().min(2).optional(),
+});
+
+export const GetAskExportRequestSchema = z.object({
+  format: AskExportFormatSchema.default("markdown"),
+  download: z.boolean().default(false),
 });
 
 export const ProgressEventSchema = z.discriminatedUnion("type", [
@@ -150,6 +156,9 @@ export const ProgressEventSchema = z.discriminatedUnion("type", [
     type: z.literal("ask.turn.completed"),
     sessionId: z.string(),
     turnId: z.string(),
+    role: AskTurnSchema.shape.role,
+    roundIndex: AskTurnSchema.shape.roundIndex,
+    roundType: AskTurnSchema.shape.roundType,
   }),
   z.object({
     type: z.literal("ask.completed"),

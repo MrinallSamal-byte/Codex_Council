@@ -3,6 +3,7 @@ import type {
   AskAgentAssignment,
   AskAgentRole,
   AskMode,
+  AskSession,
   ModelStrategy,
   ResponsePriority,
 } from "@/lib/contracts/domain";
@@ -19,6 +20,13 @@ export type CouncilTaskType =
   | "writing"
   | "security"
   | "general";
+
+export type CouncilExecutionPlan = {
+  normalizedMode: AskMode;
+  normalizedAgentCount: number;
+  activeAgents: number;
+  staged: boolean;
+};
 
 const provider = "openrouter";
 const defaultGeneralModel =
@@ -151,6 +159,47 @@ export function getCouncilRoles(
   }
 
   return [...roleSet, "judge"].slice(0, participantCount) as AskAgentRole[];
+}
+
+export function planCouncilExecution(params: {
+  mode: AskMode;
+  agentCount: number;
+}): CouncilExecutionPlan {
+  const normalizedAgentCount =
+    params.mode === "normal"
+      ? 1
+      : Math.min(Math.max(params.agentCount, 2), runtimeCapabilities.askMaxParticipants);
+  const normalizedMode =
+    normalizedAgentCount === 1 ? "normal" : params.mode;
+  const activeAgents =
+    normalizedMode === "normal"
+      ? 1
+      : Math.min(normalizedAgentCount, runtimeCapabilities.askMaxActiveAgents);
+
+  return {
+    normalizedMode,
+    normalizedAgentCount,
+    activeAgents,
+    staged: activeAgents < normalizedAgentCount,
+  };
+}
+
+export function buildCouncilMetadata(params: {
+  session: Pick<AskSession, "mode" | "agentCount" | "metadata">;
+}) {
+  const executionPlan = planCouncilExecution({
+    mode: params.session.mode,
+    agentCount: params.session.agentCount,
+  });
+
+  return {
+    ...params.session.metadata,
+    executionPlan: {
+      totalParticipants: executionPlan.normalizedAgentCount,
+      activeAgents: executionPlan.activeAgents,
+      staged: executionPlan.staged,
+    },
+  };
 }
 
 function pickModelForRole(

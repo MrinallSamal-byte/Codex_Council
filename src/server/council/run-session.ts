@@ -27,9 +27,11 @@ import { emitProgressEvent } from "@/server/orchestration/progress-bus";
 
 import {
   assignmentToModelSetting,
+  buildCouncilMetadata,
   classifyCouncilQuestion,
   getCouncilAssignments,
   getCouncilRoles,
+  planCouncilExecution,
   type CouncilTaskType,
 } from "./defaults";
 import { buildCouncilSystemPrompt, buildCouncilUserPrompt } from "./prompts";
@@ -442,7 +444,15 @@ async function executeAskSession(sessionId: string) {
 
   const session = bundle.session;
   const taskType = classifyCouncilQuestion(session.question);
-  const roles = getCouncilRoles(taskType, session.mode, session.agentCount);
+  const executionPlan = planCouncilExecution({
+    mode: session.mode,
+    agentCount: session.agentCount,
+  });
+  const roles = getCouncilRoles(
+    taskType,
+    executionPlan.normalizedMode,
+    executionPlan.normalizedAgentCount,
+  );
   const assignments = getCouncilAssignments({
     roles,
     strategy: session.modelStrategy,
@@ -450,13 +460,26 @@ async function executeAskSession(sessionId: string) {
     requestedModel: session.requestedModel,
     requestedProvider: session.requestedProvider,
   });
-  const rounds = buildRoundPlan(session.mode, roles);
-  const concurrency = Math.min(session.maxActiveAgents, runtimeCapabilities.askMaxActiveAgents);
+  const rounds = buildRoundPlan(executionPlan.normalizedMode, roles);
+  const concurrency = Math.max(
+    1,
+    Math.min(
+      executionPlan.activeAgents,
+      session.maxActiveAgents,
+      runtimeCapabilities.askMaxActiveAgents,
+    ),
+  );
+  const normalizedSession = {
+    ...session,
+    mode: executionPlan.normalizedMode,
+    agentCount: executionPlan.normalizedAgentCount,
+    maxActiveAgents: executionPlan.activeAgents,
+  };
 
   emitProgressEvent(session.id, {
     type: "ask.started",
     sessionId: session.id,
-    mode: session.mode,
+    mode: executionPlan.normalizedMode,
   });
   emitProgressEvent(session.id, {
     type: "ask.agent.assigned",
@@ -465,16 +488,21 @@ async function executeAskSession(sessionId: string) {
   });
 
   await storage.updateAskSession(session.id, {
-    ...session,
+    ...normalizedSession,
     status: "running",
     canonicalSummary: {
-      ...session.canonicalSummary,
+      ...normalizedSession.canonicalSummary,
       taskType,
       classification: taskType,
       assignments,
     },
     metadata: {
-      ...session.metadata,
+      ...buildCouncilMetadata({
+        session: {
+          ...normalizedSession,
+          metadata: normalizedSession.metadata,
+        },
+      }),
       taskType,
       rounds: rounds.map((round) => round.roundType),
     },
@@ -531,7 +559,7 @@ async function executeAskSession(sessionId: string) {
 
         const priorTurns = [...bundle.turns, ...newTurns];
         const result = await runCouncilTurn({
-          session,
+          session: normalizedSession,
           role,
           roundIndex: currentRoundIndex,
           roundType: round.roundType,
@@ -558,6 +586,9 @@ async function executeAskSession(sessionId: string) {
           type: "ask.turn.completed",
           sessionId: session.id,
           turnId: completedTurn.id,
+          role: completedTurn.role,
+          roundIndex: completedTurn.roundIndex,
+          roundType: completedTurn.roundType,
         });
       });
 
@@ -575,7 +606,7 @@ async function executeAskSession(sessionId: string) {
 
     const finalAnswer = String(finalTurn.outputJson.answer ?? finalTurn.summaryText ?? "");
     const canonicalSummary = buildCanonicalSummary({
-      session,
+      session: normalizedSession,
       taskType,
       assignments,
       finalTurn,
@@ -583,12 +614,12 @@ async function executeAskSession(sessionId: string) {
     });
 
     await storage.updateAskSession(session.id, {
-      ...session,
+      ...normalizedSession,
       status: "completed",
       finalAnswer,
       canonicalSummary,
       metadata: {
-        ...session.metadata,
+        ...normalizedSession.metadata,
         lastCompletedAt: new Date().toISOString(),
       },
       completedAt: new Date().toISOString(),
@@ -612,10 +643,10 @@ async function executeAskSession(sessionId: string) {
     });
   } catch (error) {
     await storage.updateAskSession(session.id, {
-      ...session,
+      ...normalizedSession,
       status: "failed",
       metadata: {
-        ...session.metadata,
+        ...normalizedSession.metadata,
         error: error instanceof Error ? error.message : "Ask session failed.",
       },
       completedAt: new Date().toISOString(),
@@ -636,6 +667,10 @@ export async function startAskSession(input: StartAskSessionInput) {
   const storage = getStorageAdapter();
   const sessionId = randomUUID();
   acquireAskSlot(sessionId);
+  const executionPlan = planCouncilExecution({
+    mode: input.mode,
+    agentCount: input.agentCount,
+  });
 
   try {
     const session = await storage.createAskSession({
@@ -644,8 +679,8 @@ export async function startAskSession(input: StartAskSessionInput) {
       threadId: randomUUID(),
       status: "pending",
       question: input.question,
-      mode: input.mode,
-      agentCount: Math.min(input.agentCount, runtimeCapabilities.askMaxParticipants),
+      mode: executionPlan.normalizedMode,
+      agentCount: executionPlan.normalizedAgentCount,
       modelStrategy: input.modelStrategy,
       answerStyle: input.answerStyle,
       priority: input.priority,
@@ -653,10 +688,7 @@ export async function startAskSession(input: StartAskSessionInput) {
       finalAnswerOnly: input.finalAnswerOnly,
       webLookupAllowed: input.webLookupAllowed,
       toolsAllowed: input.toolsAllowed,
-      maxActiveAgents: Math.min(
-        Math.max(1, input.agentCount === 1 ? 1 : 2),
-        runtimeCapabilities.askMaxActiveAgents,
-      ),
+      maxActiveAgents: executionPlan.activeAgents,
       requestedModel: input.requestedModel ?? null,
       requestedProvider: input.requestedProvider ?? null,
       finalAnswer: "",
@@ -674,9 +706,15 @@ export async function startAskSession(input: StartAskSessionInput) {
         assignments: [],
         history: [],
       },
-      metadata: {
-        slug: slugify(input.question).slice(0, 48),
-      },
+      metadata: buildCouncilMetadata({
+        session: {
+          mode: executionPlan.normalizedMode,
+          agentCount: executionPlan.normalizedAgentCount,
+          metadata: {
+            slug: slugify(input.question).slice(0, 48),
+          },
+        },
+      }),
       completedAt: null,
     });
 
@@ -699,6 +737,10 @@ export async function continueAskSession(
   }
 
   acquireAskSlot(sessionId);
+  const executionPlan = planCouncilExecution({
+    mode: patch.mode ?? bundle.session.mode,
+    agentCount: patch.agentCount ?? bundle.session.agentCount,
+  });
 
   try {
     const updatedSession =
@@ -706,11 +748,8 @@ export async function continueAskSession(
         ...bundle.session,
         title: buildSessionTitle(patch.question ?? bundle.session.question),
         question: patch.question ?? bundle.session.question,
-        mode: patch.mode ?? bundle.session.mode,
-        agentCount:
-          patch.agentCount !== undefined
-            ? Math.min(patch.agentCount, runtimeCapabilities.askMaxParticipants)
-            : bundle.session.agentCount,
+        mode: executionPlan.normalizedMode,
+        agentCount: executionPlan.normalizedAgentCount,
         modelStrategy: patch.modelStrategy ?? bundle.session.modelStrategy,
         answerStyle: patch.answerStyle ?? bundle.session.answerStyle,
         priority: patch.priority ?? bundle.session.priority,
@@ -719,15 +758,23 @@ export async function continueAskSession(
         finalAnswerOnly: patch.finalAnswerOnly ?? bundle.session.finalAnswerOnly,
         webLookupAllowed: patch.webLookupAllowed ?? bundle.session.webLookupAllowed,
         toolsAllowed: patch.toolsAllowed ?? bundle.session.toolsAllowed,
+        maxActiveAgents: executionPlan.activeAgents,
         requestedModel: patch.requestedModel ?? bundle.session.requestedModel,
         requestedProvider: patch.requestedProvider ?? bundle.session.requestedProvider,
         status: "pending",
         finalAnswer: "",
         completedAt: null,
-        metadata: {
-          ...bundle.session.metadata,
-          rerunCount: Number(bundle.session.metadata.rerunCount ?? 0) + 1,
-        },
+        metadata: buildCouncilMetadata({
+          session: {
+            ...bundle.session,
+            mode: executionPlan.normalizedMode,
+            agentCount: executionPlan.normalizedAgentCount,
+            metadata: {
+              ...bundle.session.metadata,
+              rerunCount: Number(bundle.session.metadata.rerunCount ?? 0) + 1,
+            },
+          },
+        }),
       })) ?? bundle.session;
 
     void executeAskSession(updatedSession.id);

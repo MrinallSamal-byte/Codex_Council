@@ -30,6 +30,31 @@ export function useLiveAskSession(initialBundle: AskSessionBundle | null) {
   const [activeRound, setActiveRound] = useState<ActiveRoundState>(null);
   const [activeRoles, setActiveRoles] = useState<AskTurn["role"][]>([]);
 
+  useEffect(() => {
+    setBundle(initialBundle);
+    setAssignments(initialBundle?.session.canonicalSummary.assignments ?? []);
+    setActiveRound(null);
+    setActiveRoles([]);
+    setProgress({
+      message:
+        initialBundle?.session.status === "completed"
+          ? "Council answer complete"
+          : initialBundle?.session.status === "running"
+            ? "Council in progress"
+            : "Ready to run",
+      percent:
+        initialBundle?.session.status === "completed"
+          ? 100
+          : initialBundle?.session.status === "running"
+            ? 10
+            : 0,
+    });
+  }, [initialBundle]);
+
+  useEffect(() => {
+    setAssignments(bundle?.session.canonicalSummary.assignments ?? []);
+  }, [bundle?.session.id, bundle?.session.canonicalSummary.assignments]);
+
   const refreshBundle = useCallback(async (sessionId: string) => {
     const response = await fetch(`/api/ask/sessions/${sessionId}`, {
       cache: "no-store",
@@ -66,6 +91,7 @@ export function useLiveAskSession(initialBundle: AskSessionBundle | null) {
         roles?: AskTurn["role"][];
         turn?: AskTurn;
         turnId?: string;
+        role?: AskTurn["role"];
         session?: AskSessionBundle;
         error?: string;
       };
@@ -102,6 +128,9 @@ export function useLiveAskSession(initialBundle: AskSessionBundle | null) {
       }
 
       if (payload.type === "ask.turn.completed" && payload.turnId) {
+        if (payload.role) {
+          setActiveRoles((current) => current.filter((role) => role !== payload.role));
+        }
         await refreshBundle(bundle.session.id);
       }
 
@@ -122,6 +151,8 @@ export function useLiveAskSession(initialBundle: AskSessionBundle | null) {
           message: payload.error ?? "Ask session failed",
           percent: 100,
         });
+        await refreshBundle(bundle.session.id);
+        setActiveRound(null);
         setActiveRoles([]);
         eventSource.close();
       }

@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
-import type { AskExport } from "@/lib/contracts/domain";
-import { buildAskExportArtifact, resolveAskArtifactPayload } from "@/server/council/export";
+import { GetAskExportRequestSchema } from "@/lib/contracts/api";
+import {
+  buildAskExportArtifact,
+  isAskExportArtifactStale,
+  resolveAskArtifactPayload,
+} from "@/server/council/export";
 import { getStorageAdapter } from "@/server/db";
 
 export async function GET(
@@ -17,13 +21,19 @@ export async function GET(
   }
 
   const url = new URL(request.url);
-  const format = (url.searchParams.get("format") ?? "markdown") as AskExport["format"];
-  const download = url.searchParams.get("download") === "true";
+  const parsed = GetAskExportRequestSchema.parse({
+    format: url.searchParams.get("format") ?? "markdown",
+    download: url.searchParams.get("download") === "true",
+  });
+  const { format, download } = parsed;
 
   const existingArtifact = bundle.exports.find((artifact) => artifact.format === format);
-  const artifact = existingArtifact ?? (await buildAskExportArtifact(bundle, format));
+  const artifact =
+    !existingArtifact || isAskExportArtifactStale(bundle, existingArtifact)
+      ? await buildAskExportArtifact(bundle, format)
+      : existingArtifact;
 
-  if (!existingArtifact) {
+  if (!existingArtifact || isAskExportArtifactStale(bundle, existingArtifact)) {
     await storage.saveAskExport(sessionId, artifact);
   }
 
