@@ -1,0 +1,332 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RepositorySourceType {
+  GITHUB
+  ZIP_UPLOAD
+  DEMO
+}
+
+enum AnalysisStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELED
+}
+
+enum FindingCategory {
+  SECURITY
+  IMPLEMENTATION
+  MAINTAINABILITY
+  FEATURE
+  ARCHITECTURE
+}
+
+enum Severity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+  INFO
+}
+
+enum FindingStatus {
+  OPEN
+  ACCEPTED
+  FALSE_POSITIVE
+  RESOLVED
+}
+
+enum AgentName {
+  SCOUT
+  ARCHITECT
+  SECURITY
+  IMPLEMENTATION
+  PRODUCT
+  JUDGE
+}
+
+enum GraphNodeType {
+  PAGE
+  ROUTE
+  CONTROLLER
+  SERVICE
+  MODEL
+  TABLE
+  EXTERNAL_API
+  AUTH
+  JOB
+  CONFIG
+  MODULE
+}
+
+enum SnapshotType {
+  CHECKPOINT
+  WORKING_SUMMARY
+  LONG_TERM
+  COMPRESSED
+}
+
+enum PatchPlanStatus {
+  DRAFT
+  REVIEWED
+  APPLIED
+  DISMISSED
+}
+
+model Repository {
+  id             String               @id @default(cuid())
+  name           String
+  sourceType     RepositorySourceType @map("source_type")
+  gitUrl         String?              @map("git_url")
+  defaultBranch  String?              @map("default_branch")
+  stackDetection Json?                @map("stack_detection")
+  metadata       Json?
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  analysisRuns   AnalysisRun[]
+  artifacts      RepoArtifact[]
+  modelSettings  ModelSetting[]
+
+  @@index([createdAt])
+  @@map("repositories")
+}
+
+model RepoArtifact {
+  id           String      @id @default(cuid())
+  repositoryId String      @map("repository_id")
+  kind         String
+  path         String
+  sizeBytes    Int?        @map("size_bytes")
+  metadata     Json?
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  repository   Repository  @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@index([repositoryId, kind])
+  @@map("repo_artifacts")
+}
+
+model AnalysisRun {
+  id            String         @id @default(cuid())
+  repositoryId  String         @map("repository_id")
+  status        AnalysisStatus @default(PENDING)
+  startedAt     DateTime       @default(now()) @map("started_at")
+  completedAt   DateTime?      @map("completed_at")
+  summary       Json?
+  threadId      String         @unique @map("thread_id")
+  activeGraphId String?        @map("active_graph_id")
+  metadata      Json?
+
+  repository         Repository          @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  agentTurns         AgentTurn[]
+  findings           Finding[]
+  featureSuggestions FeatureSuggestion[]
+  graphNodes         GraphNode[]
+  graphEdges         GraphEdge[]
+  memorySnapshots    MemorySnapshot[]
+  patchPlans         PatchPlan[]
+  exportReports      ExportReport[]
+  toolExecutions     ToolExecution[]
+
+  @@index([repositoryId, startedAt])
+  @@index([status, startedAt])
+  @@map("analysis_runs")
+}
+
+model AgentTurn {
+  id           String    @id @default(cuid())
+  analysisRunId String   @map("analysis_run_id")
+  agentName    AgentName @map("agent_name")
+  model        String
+  provider     String
+  turnIndex    Int       @map("turn_index")
+  inputSummary String?   @map("input_summary")
+  outputJson   Json      @map("output_json")
+  evidenceRefs Json?     @map("evidence_refs")
+  metadata     Json?
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  analysisRun  AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisRunId, turnIndex])
+  @@index([analysisRunId, agentName])
+  @@map("agent_turns")
+}
+
+model Finding {
+  id           String          @id @default(cuid())
+  analysisRunId String         @map("analysis_run_id")
+  category     FindingCategory
+  severity     Severity
+  confidence   Float
+  title        String
+  description  String
+  filePath     String?         @map("file_path")
+  symbol       String?
+  lineStart    Int?            @map("line_start")
+  lineEnd      Int?            @map("line_end")
+  impactedAreas String[]       @default([]) @map("impacted_areas")
+  evidenceJson Json            @map("evidence_json")
+  status       FindingStatus   @default(OPEN)
+  sourceAgent  AgentName       @map("source_agent")
+  metadata     Json?
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  analysisRun  AnalysisRun     @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@index([analysisRunId, category, severity])
+  @@index([analysisRunId, status])
+  @@map("findings")
+}
+
+model FeatureSuggestion {
+  id              String      @id @default(cuid())
+  analysisRunId   String      @map("analysis_run_id")
+  title           String
+  value           String
+  rationale       String
+  impactedModules String[]    @default([]) @map("impacted_modules")
+  effort          String
+  risk            String
+  securityNotes   String      @map("security_notes")
+  metadata        Json?
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  analysisRun     AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@index([analysisRunId])
+  @@map("feature_suggestions")
+}
+
+model GraphNode {
+  id            String        @id @default(cuid())
+  analysisRunId String        @map("analysis_run_id")
+  nodeKey       String        @map("node_key")
+  type          GraphNodeType
+  label         String
+  filePath      String?       @map("file_path")
+  symbol        String?
+  metadata      Json?
+  position      Json?
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  analysisRun   AnalysisRun   @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisRunId, nodeKey])
+  @@index([analysisRunId, type])
+  @@map("graph_nodes")
+}
+
+model GraphEdge {
+  id            String      @id @default(cuid())
+  analysisRunId String      @map("analysis_run_id")
+  edgeKey       String      @map("edge_key")
+  sourceNodeKey String      @map("source_node_key")
+  targetNodeKey String      @map("target_node_key")
+  label         String?
+  kind          String
+  metadata      Json?
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  analysisRun   AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@unique([analysisRunId, edgeKey])
+  @@index([analysisRunId, sourceNodeKey])
+  @@index([analysisRunId, targetNodeKey])
+  @@map("graph_edges")
+}
+
+model MemorySnapshot {
+  id             String       @id @default(cuid())
+  analysisRunId  String       @map("analysis_run_id")
+  snapshotType   SnapshotType @map("snapshot_type")
+  canonicalState Json         @map("canonical_state")
+  summaryText    String?      @map("summary_text")
+  tokenEstimate  Int?         @map("token_estimate")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  analysisRun    AnalysisRun  @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@index([analysisRunId, snapshotType, createdAt])
+  @@map("memory_snapshots")
+}
+
+model PatchPlan {
+  id                String          @id @default(cuid())
+  analysisRunId     String          @map("analysis_run_id")
+  findingId         String?         @map("finding_id")
+  title             String
+  whyItMatters      String          @map("why_it_matters")
+  rootCause         String          @map("root_cause")
+  filesAffected     String[]        @default([]) @map("files_affected")
+  recommendedSteps  Json            @map("recommended_steps")
+  draftPatch        String?         @map("draft_patch")
+  confidence        Float
+  status            PatchPlanStatus @default(DRAFT)
+  metadata          Json?
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  analysisRun       AnalysisRun     @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@index([analysisRunId, status])
+  @@map("patch_plans")
+}
+
+model ExportReport {
+  id            String      @id @default(cuid())
+  analysisRunId String      @map("analysis_run_id")
+  title         String
+  format        String
+  content       String
+  metadata      Json?
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  analysisRun   AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@index([analysisRunId, format])
+  @@map("export_reports")
+}
+
+model ToolExecution {
+  id            String      @id @default(cuid())
+  analysisRunId String      @map("analysis_run_id")
+  toolName      String      @map("tool_name")
+  inputJson     Json        @map("input_json")
+  outputJson    Json        @map("output_json")
+  status        String
+  findingIds    String[]    @default([]) @map("finding_ids")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  analysisRun   AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+
+  @@index([analysisRunId, toolName])
+  @@map("tool_executions")
+}
+
+model ModelSetting {
+  id             String      @id @default(cuid())
+  repositoryId   String?     @map("repository_id")
+  agentName      AgentName   @map("agent_name")
+  provider       String
+  model          String
+  temperature    Float       @default(0.2)
+  maxTokens      Int?        @map("max_tokens")
+  fallbackModels Json?       @map("fallback_models")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  repository     Repository? @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, agentName])
+  @@index([agentName])
+  @@map("model_settings")
+}

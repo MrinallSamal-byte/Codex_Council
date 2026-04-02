@@ -1,0 +1,41 @@
+# RepoCouncil starter spec for DigitalOcean App Platform.
+# Update the repo/branch if you publish under a different name.
+# Set DATABASE_URL in App Platform as a secret with RUN_AND_BUILD_TIME scope.
+# Set OPENROUTER_API_KEY in App Platform if you want live model calls.
+
+name: repocouncil
+region: blr
+
+services:
+  - name: web
+    environment_slug: node-js
+    github:
+      repo: MrinallSamal-byte/Codex_Council
+      branch: main
+      deploy_on_push: true
+    source_dir: /
+    build_command: if [ -n "$DATABASE_URL" ]; then npm run db:push; else echo "Skipping Prisma schema sync because DATABASE_URL is not set."; fi && npm run build
+    run_command: npm start
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-1gb
+    health_check:
+      http_path: /
+      initial_delay_seconds: 15
+      period_seconds: 15
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      - key: NODE_ENV
+        value: production
+        scope: RUN_TIME
+        type: general
+      - key: DEMO_MODE
+        value: "false"
+        scope: RUN_TIME
+        type: general
+      - key: REPO_STORAGE_ROOT
+        value: /tmp/repocouncil/workspaces
+        scope: RUN_TIME
+        type: general

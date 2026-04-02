@@ -1,0 +1,59 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: repocouncil:local
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://repocouncil:repocouncil@db:5432/repocouncil?schema=public}
+      REDIS_URL: ${REDIS_URL:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      REPO_STORAGE_ROOT: ${REPO_STORAGE_ROOT:-/var/lib/repocouncil/workspaces}
+      EXPORT_STORAGE_ROOT: ${EXPORT_STORAGE_ROOT:-/var/lib/repocouncil/exports}
+      ANALYSIS_MAX_CONCURRENCY: ${ANALYSIS_MAX_CONCURRENCY:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENABLE_SEMGREP: ${ENABLE_SEMGREP:-false}
+      ENABLE_CODEQL: ${ENABLE_CODEQL:-false}
+      RUN_DB_PUSH_ON_START: ${RUN_DB_PUSH_ON_START:-true}
+      DB_CONNECT_MAX_RETRIES: ${DB_CONNECT_MAX_RETRIES:-10}
+      RECOVER_RUNNING_RUNS_ON_START: ${RECOVER_RUNNING_RUNS_ON_START:-true}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - repocouncil_data:/var/lib/repocouncil
+    healthcheck:
+      test: ["CMD", "node", "deployment/scripts/healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+  db:
+    profiles: ["local"]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: repocouncil
+      POSTGRES_USER: repocouncil
+      POSTGRES_PASSWORD: repocouncil
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U repocouncil -d repocouncil"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  repocouncil_data:

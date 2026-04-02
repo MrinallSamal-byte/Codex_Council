@@ -1,0 +1,34 @@
+services:
+  app:
+    image: repocouncil:prod
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set NEXT_PUBLIC_APP_URL in your production .env}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to your managed PostgreSQL URL}
+      REDIS_URL: ${REDIS_URL:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      DEMO_MODE: "false"
+      REPO_STORAGE_ROOT: ${REPO_STORAGE_ROOT:-/var/lib/repocouncil/workspaces}
+      EXPORT_STORAGE_ROOT: ${EXPORT_STORAGE_ROOT:-/var/lib/repocouncil/exports}
+      ANALYSIS_MAX_CONCURRENCY: ${ANALYSIS_MAX_CONCURRENCY:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ENABLE_SEMGREP: ${ENABLE_SEMGREP:-false}
+      ENABLE_CODEQL: ${ENABLE_CODEQL:-false}
+      RUN_DB_PUSH_ON_START: ${RUN_DB_PUSH_ON_START:-true}
+      DB_CONNECT_MAX_RETRIES: ${DB_CONNECT_MAX_RETRIES:-10}
+      RECOVER_RUNNING_RUNS_ON_START: ${RECOVER_RUNNING_RUNS_ON_START:-true}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - repocouncil_data:/var/lib/repocouncil
+
+volumes:
+  repocouncil_data:
+    name: repocouncil_data

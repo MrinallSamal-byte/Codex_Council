@@ -1,0 +1,14 @@
+{
+  "name": "demo-commerce",
+  "private": true,
+  "dependencies": {
+    "next": "15.5.14",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "@prisma/client": "6.19.3"
+  },
+  "devDependencies": {
+    "prisma": "6.19.3",
+    "typescript": "^5"
+  }
+}
