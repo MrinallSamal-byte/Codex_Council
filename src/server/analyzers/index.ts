@@ -39,7 +39,7 @@ export async function runAnalyzerSuite(workspacePath: string, analysisRunId: str
   const findings = dedupeFindings([
     ...todos.findings,
     ...packageAudit.advisories.map((advisory, index) => ({
-      id: `package_audit_${index}`,
+      id: `package_audit_${analysisRunId}_${index}`,
       analysisRunId,
       category: "security" as const,
       severity: "medium" as const,
@@ -64,7 +64,7 @@ export async function runAnalyzerSuite(workspacePath: string, analysisRunId: str
     ...testPresence.coverage
       .filter((entry) => entry.matchingTests.length === 0)
       .map((entry, index) => ({
-        id: `test_presence_${index}`,
+        id: `test_presence_${analysisRunId}_${index}`,
         analysisRunId,
         category: "implementation" as const,
         severity: "medium" as const,

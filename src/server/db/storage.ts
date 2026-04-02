@@ -3,6 +3,10 @@ import { z } from "zod";
 import type {
   AnalysisBundle,
   AnalysisRun,
+  AskExport as DomainAskExport,
+  AskSession,
+  AskSessionBundle,
+  AskTurn,
   ExportReportSchema,
   FeatureSuggestion,
   Finding,
@@ -17,6 +21,7 @@ import type {
 
 export type ToolExecution = z.infer<typeof ToolExecutionSchema>;
 export type ExportReport = z.infer<typeof ExportReportSchema>;
+export type AskExport = DomainAskExport;
 
 export interface StorageAdapter {
   listRepositories(): Promise<Repository[]>;
@@ -39,6 +44,17 @@ export interface StorageAdapter {
   saveReport(runId: string, report: ExportReport): Promise<void>;
   listModelSettings(repositoryId?: string): Promise<ModelSetting[]>;
   upsertModelSettings(settings: ModelSetting[]): Promise<ModelSetting[]>;
+  listAskSessions(limit?: number): Promise<AskSession[]>;
+  createAskSession(
+    input: Omit<AskSession, "createdAt" | "updatedAt"> & {
+      createdAt?: string;
+      updatedAt?: string;
+    },
+  ): Promise<AskSession>;
+  updateAskSession(sessionId: string, patch: Partial<AskSession>): Promise<AskSession | null>;
+  getAskSessionBundle(sessionId: string): Promise<AskSessionBundle | null>;
+  appendAskTurn(sessionId: string, turn: AskTurn): Promise<void>;
+  saveAskExport(sessionId: string, artifact: AskExport): Promise<void>;
 }
 
 export function enumToPrisma(value: string) {

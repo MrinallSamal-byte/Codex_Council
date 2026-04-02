@@ -2,6 +2,10 @@ import {
   AnalysisBundleSchema,
   type AnalysisBundle,
   type AnalysisRun,
+  AskSessionBundleSchema,
+  type AskExport,
+  type AskSession,
+  type AskTurn,
   type FeatureSuggestion,
   type Finding,
   type GraphEdge,
@@ -59,6 +63,58 @@ function mapRun(record: {
     completedAt: toIso(record.completedAt),
     summary: (record.summary ?? {}) as AnalysisRun["summary"],
     threadId: record.threadId,
+  };
+}
+
+function mapAskSession(record: {
+  id: string;
+  title: string;
+  threadId: string;
+  status: string;
+  question: string;
+  mode: string;
+  agentCount: number;
+  modelStrategy: string;
+  answerStyle: string;
+  priority: string;
+  showDebateProcess: boolean;
+  finalAnswerOnly: boolean;
+  webLookupAllowed: boolean;
+  toolsAllowed: boolean;
+  maxActiveAgents: number;
+  requestedModel: string | null;
+  requestedProvider: string | null;
+  finalAnswer: string | null;
+  canonicalSummary: unknown;
+  metadata: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt: Date | null;
+}): AskSession {
+  return {
+    id: record.id,
+    title: record.title,
+    threadId: record.threadId,
+    status: enumFromPrisma<AskSession["status"]>(record.status),
+    question: record.question,
+    mode: enumFromPrisma<AskSession["mode"]>(record.mode),
+    agentCount: record.agentCount,
+    modelStrategy: enumFromPrisma<AskSession["modelStrategy"]>(record.modelStrategy),
+    answerStyle: enumFromPrisma<AskSession["answerStyle"]>(record.answerStyle),
+    priority: enumFromPrisma<AskSession["priority"]>(record.priority),
+    showDebateProcess: record.showDebateProcess,
+    finalAnswerOnly: record.finalAnswerOnly,
+    webLookupAllowed: record.webLookupAllowed,
+    toolsAllowed: record.toolsAllowed,
+    maxActiveAgents: record.maxActiveAgents,
+    requestedModel: record.requestedModel,
+    requestedProvider: record.requestedProvider,
+    finalAnswer: record.finalAnswer ?? "",
+    canonicalSummary: (record.canonicalSummary ?? {}) as AskSession["canonicalSummary"],
+    metadata: (record.metadata ?? {}) as AskSession["metadata"],
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+    completedAt: toIso(record.completedAt),
   };
 }
 
@@ -508,5 +564,200 @@ export class PrismaStorageAdapter implements StorageAdapter {
     }
 
     return this.listModelSettings(settings[0]?.repositoryId ?? undefined);
+  }
+
+  async listAskSessions(limit = 25) {
+    const sessions = await prisma.askSession.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: limit,
+    });
+
+    return sessions.map(mapAskSession);
+  }
+
+  async createAskSession(
+    input: Omit<AskSession, "createdAt" | "updatedAt"> & {
+      createdAt?: string;
+      updatedAt?: string;
+    },
+  ) {
+    const session = await prisma.askSession.create({
+      data: {
+        id: input.id,
+        title: input.title,
+        threadId: input.threadId,
+        status: enumToPrisma(input.status) as never,
+        question: input.question,
+        mode: enumToPrisma(input.mode) as never,
+        agentCount: input.agentCount,
+        modelStrategy: enumToPrisma(input.modelStrategy) as never,
+        answerStyle: enumToPrisma(input.answerStyle) as never,
+        priority: enumToPrisma(input.priority) as never,
+        showDebateProcess: input.showDebateProcess,
+        finalAnswerOnly: input.finalAnswerOnly,
+        webLookupAllowed: input.webLookupAllowed,
+        toolsAllowed: input.toolsAllowed,
+        maxActiveAgents: input.maxActiveAgents,
+        requestedModel: input.requestedModel ?? null,
+        requestedProvider: input.requestedProvider ?? null,
+        finalAnswer: input.finalAnswer || null,
+        canonicalSummary: input.canonicalSummary,
+        metadata: input.metadata,
+        createdAt: input.createdAt ? new Date(input.createdAt) : undefined,
+        updatedAt: input.updatedAt ? new Date(input.updatedAt) : undefined,
+        completedAt: input.completedAt ? new Date(input.completedAt) : null,
+      },
+    });
+
+    return mapAskSession(session);
+  }
+
+  async updateAskSession(sessionId: string, patch: Partial<AskSession>) {
+    const session = await prisma.askSession.update({
+      where: { id: sessionId },
+      data: {
+        title: patch.title,
+        status: patch.status ? (enumToPrisma(patch.status) as never) : undefined,
+        question: patch.question,
+        mode: patch.mode ? (enumToPrisma(patch.mode) as never) : undefined,
+        agentCount: patch.agentCount,
+        modelStrategy: patch.modelStrategy
+          ? (enumToPrisma(patch.modelStrategy) as never)
+          : undefined,
+        answerStyle: patch.answerStyle
+          ? (enumToPrisma(patch.answerStyle) as never)
+          : undefined,
+        priority: patch.priority ? (enumToPrisma(patch.priority) as never) : undefined,
+        showDebateProcess: patch.showDebateProcess,
+        finalAnswerOnly: patch.finalAnswerOnly,
+        webLookupAllowed: patch.webLookupAllowed,
+        toolsAllowed: patch.toolsAllowed,
+        maxActiveAgents: patch.maxActiveAgents,
+        requestedModel:
+          patch.requestedModel === undefined ? undefined : patch.requestedModel ?? null,
+        requestedProvider:
+          patch.requestedProvider === undefined
+            ? undefined
+            : patch.requestedProvider ?? null,
+        finalAnswer: patch.finalAnswer === undefined ? undefined : patch.finalAnswer ?? null,
+        canonicalSummary: patch.canonicalSummary,
+        metadata: patch.metadata,
+        completedAt:
+          patch.completedAt === undefined
+            ? undefined
+            : patch.completedAt
+              ? new Date(patch.completedAt)
+              : null,
+      },
+    });
+
+    return mapAskSession(session);
+  }
+
+  async getAskSessionBundle(sessionId: string) {
+    const session = await prisma.askSession.findUnique({
+      where: { id: sessionId },
+      include: {
+        turns: {
+          orderBy: [{ turnIndex: "asc" }],
+        },
+        exports: {
+          orderBy: [{ createdAt: "desc" }],
+        },
+      },
+    });
+
+    if (!session) {
+      return null;
+    }
+
+    return AskSessionBundleSchema.parse({
+      session: mapAskSession(session),
+      turns: session.turns.map((turn) => ({
+        id: turn.id,
+        sessionId: turn.sessionId,
+        role: enumFromPrisma<AskTurn["role"]>(turn.role),
+        roundIndex: turn.roundIndex,
+        roundType: enumFromPrisma<AskTurn["roundType"]>(turn.roundType),
+        turnIndex: turn.turnIndex,
+        status: enumFromPrisma<AskTurn["status"]>(turn.status),
+        model: turn.model,
+        provider: turn.provider,
+        inputSummary: turn.inputSummary ?? "",
+        outputJson: (turn.outputJson ?? {}) as AskTurn["outputJson"],
+        summaryText: turn.summaryText ?? "",
+        metadata: (turn.metadata ?? undefined) as AskTurn["metadata"],
+        createdAt: turn.createdAt.toISOString(),
+      })),
+      exports: session.exports.map((artifact) => ({
+        id: artifact.id,
+        sessionId: artifact.sessionId,
+        title: artifact.title,
+        format: artifact.format as AskExport["format"],
+        content: artifact.content,
+        metadata: (artifact.metadata ?? {}) as AskExport["metadata"],
+        createdAt: artifact.createdAt.toISOString(),
+      })),
+    });
+  }
+
+  async appendAskTurn(sessionId: string, turn: AskTurn) {
+    await prisma.askTurn.upsert({
+      where: {
+        sessionId_turnIndex: {
+          sessionId,
+          turnIndex: turn.turnIndex,
+        },
+      },
+      update: {
+        role: enumToPrisma(turn.role) as never,
+        roundIndex: turn.roundIndex,
+        roundType: enumToPrisma(turn.roundType) as never,
+        status: enumToPrisma(turn.status) as never,
+        model: turn.model,
+        provider: turn.provider,
+        inputSummary: turn.inputSummary,
+        outputJson: turn.outputJson,
+        summaryText: turn.summaryText,
+        metadata: turn.metadata,
+      },
+      create: {
+        id: turn.id,
+        sessionId,
+        role: enumToPrisma(turn.role) as never,
+        roundIndex: turn.roundIndex,
+        roundType: enumToPrisma(turn.roundType) as never,
+        turnIndex: turn.turnIndex,
+        status: enumToPrisma(turn.status) as never,
+        model: turn.model,
+        provider: turn.provider,
+        inputSummary: turn.inputSummary,
+        outputJson: turn.outputJson,
+        summaryText: turn.summaryText,
+        metadata: turn.metadata,
+        createdAt: new Date(turn.createdAt),
+      },
+    });
+  }
+
+  async saveAskExport(sessionId: string, artifact: AskExport) {
+    await prisma.askExport.upsert({
+      where: { id: artifact.id },
+      update: {
+        title: artifact.title,
+        format: artifact.format,
+        content: artifact.content,
+        metadata: artifact.metadata,
+      },
+      create: {
+        id: artifact.id,
+        sessionId,
+        title: artifact.title,
+        format: artifact.format,
+        content: artifact.content,
+        metadata: artifact.metadata,
+        createdAt: new Date(artifact.createdAt),
+      },
+    });
   }
 }

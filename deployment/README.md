@@ -23,6 +23,7 @@ For a smaller smoke-test environment, 1 vCPU / 2 GB RAM can work, but analysis t
 - `deployment/scripts/healthcheck.mjs`
 - `deployment/scripts/recover-runs.mjs`
 - `deployment/scripts/post-deploy-check.sh`
+- `deployment/scripts/verify-deployed-analysis.mjs`
 
 ## Environment variables
 
@@ -38,6 +39,7 @@ Optional but recommended:
 - `REPO_STORAGE_ROOT`
 - `EXPORT_STORAGE_ROOT`
 - `ANALYSIS_MAX_CONCURRENCY`
+- `NODE_OPTIONS`
 - `LOG_LEVEL`
 - `ENABLE_SEMGREP`
 - `ENABLE_CODEQL`
@@ -97,6 +99,7 @@ Set at minimum:
 - `DATABASE_URL=postgresql://...`
 - `DEMO_MODE=false`
 - `ANALYSIS_MAX_CONCURRENCY=1`
+- `NODE_OPTIONS=--max-old-space-size=768`
 - `RUN_DB_PUSH_ON_START=true`
 
 4. Build and start the containerized app:
@@ -168,6 +171,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 - readiness endpoint: `/api/ready`
 - analysis status endpoint: `/api/analysis/:runId/status`
 - startup validation fails fast on missing required runtime config
+- markdown exports are persisted under `EXPORT_STORAGE_ROOT/<run-id>/`
 - running or pending analyses are marked as interrupted-on-restart in the database summary and surfaced as failed/recoverable
 
 ## Troubleshooting
@@ -227,3 +231,18 @@ Manual checklist:
 - debate stream updates appear
 - report export downloads
 - refresh and resume still work
+
+Automated flow verification from the running app container:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec app \
+  node deployment/scripts/verify-deployed-analysis.mjs http://127.0.0.1:3000
+```
+
+That script verifies:
+
+- demo repo import
+- live SSE debate/progress streaming
+- analysis completion with persisted snapshots
+- markdown report download and on-disk export artifact creation
+- resume from a synthetic persisted checkpoint

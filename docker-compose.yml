@@ -19,6 +19,10 @@ services:
       REPO_STORAGE_ROOT: ${REPO_STORAGE_ROOT:-/var/lib/repocouncil/workspaces}
       EXPORT_STORAGE_ROOT: ${EXPORT_STORAGE_ROOT:-/var/lib/repocouncil/exports}
       ANALYSIS_MAX_CONCURRENCY: ${ANALYSIS_MAX_CONCURRENCY:-1}
+      ASK_MAX_CONCURRENCY: ${ASK_MAX_CONCURRENCY:-1}
+      ASK_MAX_ACTIVE_AGENTS: ${ASK_MAX_ACTIVE_AGENTS:-2}
+      ASK_MAX_PARTICIPANTS: ${ASK_MAX_PARTICIPANTS:-6}
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=768}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       ENABLE_SEMGREP: ${ENABLE_SEMGREP:-false}
       ENABLE_CODEQL: ${ENABLE_CODEQL:-false}
@@ -29,6 +33,7 @@ services:
       - "${APP_PORT:-3000}:3000"
     volumes:
       - repocouncil_data:/var/lib/repocouncil
+    stop_grace_period: 30s
     healthcheck:
       test: ["CMD", "node", "deployment/scripts/healthcheck.mjs"]
       interval: 30s

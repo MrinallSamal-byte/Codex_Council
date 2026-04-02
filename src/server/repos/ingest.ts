@@ -31,6 +31,7 @@ export async function importDemoRepository() {
 
   return storage.createRepository({
     ...demoBundle.repository,
+    id: `repo_demo_${randomUUID()}`,
     metadata: {
       ...demoBundle.repository.metadata,
       workspacePath,

@@ -17,7 +17,9 @@ function getRegistry() {
 function getEmitter(runId: string) {
   const registry = getRegistry();
   if (!registry.has(runId)) {
-    registry.set(runId, new EventEmitter());
+    const emitter = new EventEmitter();
+    emitter.setMaxListeners(0);
+    registry.set(runId, emitter);
   }
   return registry.get(runId)!;
 }

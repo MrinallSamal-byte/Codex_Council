@@ -1,6 +1,10 @@
 import type {
   AnalysisBundle,
   AnalysisRun,
+  AskExport,
+  AskSession,
+  AskSessionBundle,
+  AskTurn,
   FeatureSuggestion,
   Finding,
   GraphEdge,
@@ -12,11 +16,13 @@ import type {
 } from "@/lib/contracts/domain";
 
 import { createDemoBundle } from "../demo/data";
+import { createDemoAskSessionBundle } from "../demo/council";
 import { normalizeFindings } from "../findings/normalize";
 import type { ExportReport, StorageAdapter, ToolExecution } from "./storage";
 
 declare global {
   var __repocouncil_demo_bundle__: AnalysisBundle | undefined;
+  var __repocouncil_demo_ask_bundles__: AskSessionBundle[] | undefined;
 }
 
 function getMutableBundle() {
@@ -25,6 +31,14 @@ function getMutableBundle() {
   }
 
   return global.__repocouncil_demo_bundle__;
+}
+
+function getMutableAskBundles() {
+  if (!global.__repocouncil_demo_ask_bundles__) {
+    global.__repocouncil_demo_ask_bundles__ = [structuredClone(createDemoAskSessionBundle())];
+  }
+
+  return global.__repocouncil_demo_ask_bundles__;
 }
 
 export class DemoStorageAdapter implements StorageAdapter {
@@ -168,5 +182,85 @@ export class DemoStorageAdapter implements StorageAdapter {
       id: setting.id ?? `model_setting_dynamic_${index + 1}`,
     }));
     return structuredClone(bundle.modelSettings);
+  }
+
+  async listAskSessions(limit = 25) {
+    return structuredClone(
+      getMutableAskBundles()
+        .map((bundle) => bundle.session)
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+        .slice(0, limit),
+    );
+  }
+
+  async createAskSession(
+    input: Omit<AskSession, "createdAt" | "updatedAt"> & {
+      createdAt?: string;
+      updatedAt?: string;
+    },
+  ) {
+    const bundles = getMutableAskBundles();
+    const session: AskSession = {
+      ...input,
+      finalAnswer: input.finalAnswer ?? "",
+      canonicalSummary: input.canonicalSummary,
+      metadata: input.metadata,
+      createdAt: input.createdAt ?? new Date().toISOString(),
+      updatedAt: input.updatedAt ?? new Date().toISOString(),
+    };
+
+    bundles.unshift({
+      session,
+      turns: [],
+      exports: [],
+    });
+
+    return structuredClone(session);
+  }
+
+  async updateAskSession(sessionId: string, patch: Partial<AskSession>) {
+    const bundle = getMutableAskBundles().find((item) => item.session.id === sessionId);
+    if (!bundle) {
+      return null;
+    }
+
+    bundle.session = {
+      ...bundle.session,
+      ...patch,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return structuredClone(bundle.session);
+  }
+
+  async getAskSessionBundle(sessionId: string) {
+    const bundle = getMutableAskBundles().find((item) => item.session.id === sessionId);
+    return bundle ? structuredClone(bundle) : null;
+  }
+
+  async appendAskTurn(sessionId: string, turn: AskTurn) {
+    const bundle = getMutableAskBundles().find((item) => item.session.id === sessionId);
+    if (!bundle) {
+      return;
+    }
+
+    bundle.turns = [
+      ...bundle.turns.filter((item) => item.turnIndex !== turn.turnIndex),
+      turn,
+    ].sort((left, right) => left.turnIndex - right.turnIndex);
+    bundle.session.updatedAt = new Date().toISOString();
+  }
+
+  async saveAskExport(sessionId: string, artifact: AskExport) {
+    const bundle = getMutableAskBundles().find((item) => item.session.id === sessionId);
+    if (!bundle) {
+      return;
+    }
+
+    bundle.exports = [
+      artifact,
+      ...bundle.exports.filter((item) => item.id !== artifact.id),
+    ];
+    bundle.session.updatedAt = new Date().toISOString();
   }
 }

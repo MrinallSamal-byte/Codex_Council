@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, GitBranch, ShieldAlert, Sparkles } from "lucide-react";
+import { ArrowRight, BrainCircuit, GitBranch, ShieldAlert, Sparkles } from "lucide-react";
 
 import type { AnalysisBundle } from "@/lib/contracts/domain";
 
@@ -82,6 +82,7 @@ export function DashboardView({ initialBundle }: { initialBundle: AnalysisBundle
               <QuickJump href="/security" icon={ShieldAlert} label="Review security findings" />
               <QuickJump href="/architecture" icon={GitBranch} label="Inspect architecture graph" />
               <QuickJump href="/features" icon={Sparkles} label="See five feature bets" />
+              <QuickJump href="/ask" icon={BrainCircuit} label="Open Ask / Council mode" />
             </CardContent>
           </Card>
         </div>

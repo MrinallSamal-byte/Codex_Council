@@ -3,7 +3,7 @@ import { slugify } from "@/lib/utils";
 
 export function buildPatchPlans(runId: string, findings: Finding[]): PatchPlan[] {
   return findings.slice(0, 5).map((finding) => ({
-    id: `patch_${slugify(finding.id)}`,
+    id: `patch_${slugify(runId)}_${slugify(finding.id)}`,
     analysisRunId: runId,
     findingId: finding.id,
     title: `Plan fix for: ${finding.title}`,

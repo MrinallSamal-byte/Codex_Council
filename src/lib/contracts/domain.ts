@@ -49,6 +49,38 @@ export const SnapshotTypeSchema = z.enum([
   "long_term",
   "compressed",
 ]);
+export const AskModeSchema = z.enum(["normal", "debate", "deep_council"]);
+export const ModelStrategySchema = z.enum(["single", "mixed", "auto"]);
+export const AnswerStyleSchema = z.enum(["concise", "balanced", "detailed"]);
+export const ResponsePrioritySchema = z.enum(["speed", "balanced", "quality"]);
+export const AskAgentRoleSchema = z.enum([
+  "researcher",
+  "skeptic",
+  "strategist",
+  "builder",
+  "critic",
+  "judge",
+  "product",
+  "security",
+  "ux",
+  "teacher",
+  "devils_advocate",
+  "optimizer",
+]);
+export const AskRoundTypeSchema = z.enum([
+  "opening",
+  "critique",
+  "refinement",
+  "judgment",
+]);
+export const AskTurnStatusSchema = z.enum(["queued", "running", "completed", "failed"]);
+export const AskExportFormatSchema = z.enum([
+  "markdown",
+  "json",
+  "pdf",
+  "zip",
+  "transcript",
+]);
 export const ImpactedAreaSchema = z.enum([
   "auth",
   "routing",
@@ -194,6 +226,90 @@ export const AgentTurnMetadataSchema = z.object({
   resumedFromTurnCount: z.number().int().optional(),
 });
 
+export const AskAgentAssignmentSchema = z.object({
+  role: AskAgentRoleSchema,
+  label: z.string(),
+  rationale: z.string(),
+  provider: z.string(),
+  model: z.string(),
+  fallbackModels: z.array(z.string()).default([]),
+  active: z.boolean().default(true),
+});
+
+export const AskHistoryEntrySchema = z.object({
+  question: z.string(),
+  finalAnswer: z.string().default(""),
+  createdAt: z.string(),
+});
+
+export const AskSessionSummarySchema = z.object({
+  taskType: z.string().default("general"),
+  classification: z.string().default("general"),
+  contextSummary: z.string().default(""),
+  keySupportingViewpoints: z.array(z.string()).default([]),
+  disagreements: z.array(z.string()).default([]),
+  actionPlan: z.array(z.string()).default([]),
+  minorityView: z.string().default(""),
+  confidence: z.number().min(0).max(1).default(0),
+  finalAnswerModel: z.string().default(""),
+  finalAnswerProvider: z.string().default(""),
+  assignments: z.array(AskAgentAssignmentSchema).default([]),
+  history: z.array(AskHistoryEntrySchema).default([]),
+});
+
+export const AskSessionSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  threadId: z.string(),
+  status: AnalysisStatusSchema,
+  question: z.string(),
+  mode: AskModeSchema,
+  agentCount: z.number().int().min(1).max(6),
+  modelStrategy: ModelStrategySchema,
+  answerStyle: AnswerStyleSchema,
+  priority: ResponsePrioritySchema,
+  showDebateProcess: z.boolean().default(true),
+  finalAnswerOnly: z.boolean().default(false),
+  webLookupAllowed: z.boolean().default(false),
+  toolsAllowed: z.boolean().default(false),
+  maxActiveAgents: z.number().int().min(1).max(6),
+  requestedModel: z.string().nullable().optional(),
+  requestedProvider: z.string().nullable().optional(),
+  finalAnswer: z.string().default(""),
+  canonicalSummary: AskSessionSummarySchema,
+  metadata: z.record(z.any()).default({}),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  completedAt: z.string().nullable().optional(),
+});
+
+export const AskTurnSchema = z.object({
+  id: z.string(),
+  sessionId: z.string(),
+  role: AskAgentRoleSchema,
+  roundIndex: z.number().int(),
+  roundType: AskRoundTypeSchema,
+  turnIndex: z.number().int(),
+  status: AskTurnStatusSchema.default("completed"),
+  model: z.string(),
+  provider: z.string(),
+  inputSummary: z.string().default(""),
+  outputJson: z.record(z.any()).default({}),
+  summaryText: z.string().default(""),
+  metadata: AgentTurnMetadataSchema.optional(),
+  createdAt: z.string(),
+});
+
+export const AskExportSchema = z.object({
+  id: z.string(),
+  sessionId: z.string(),
+  title: z.string(),
+  format: AskExportFormatSchema,
+  content: z.string(),
+  metadata: z.record(z.any()).default({}),
+  createdAt: z.string(),
+});
+
 export const WorkingMemorySchema = z.object({
   repoSummary: z.string().default(""),
   architectureSummary: z.string().default(""),
@@ -267,6 +383,12 @@ export const AnalysisBundleSchema = z.object({
   modelSettings: z.array(ModelSettingSchema),
 });
 
+export const AskSessionBundleSchema = z.object({
+  session: AskSessionSchema,
+  turns: z.array(AskTurnSchema),
+  exports: z.array(AskExportSchema),
+});
+
 export type Repository = z.infer<typeof RepositorySchema>;
 export type AnalysisRun = z.infer<typeof AnalysisRunSchema>;
 export type AgentName = z.infer<typeof AgentNameSchema>;
@@ -282,3 +404,17 @@ export type PatchPlan = z.infer<typeof PatchPlanSchema>;
 export type ModelSetting = z.infer<typeof ModelSettingSchema>;
 export type AgentTurn = z.infer<typeof AgentTurnSchema>;
 export type AnalysisBundle = z.infer<typeof AnalysisBundleSchema>;
+export type AskMode = z.infer<typeof AskModeSchema>;
+export type ModelStrategy = z.infer<typeof ModelStrategySchema>;
+export type AnswerStyle = z.infer<typeof AnswerStyleSchema>;
+export type ResponsePriority = z.infer<typeof ResponsePrioritySchema>;
+export type AskAgentRole = z.infer<typeof AskAgentRoleSchema>;
+export type AskRoundType = z.infer<typeof AskRoundTypeSchema>;
+export type AskTurnStatus = z.infer<typeof AskTurnStatusSchema>;
+export type AskAgentAssignment = z.infer<typeof AskAgentAssignmentSchema>;
+export type AskSessionSummary = z.infer<typeof AskSessionSummarySchema>;
+export type AskHistoryEntry = z.infer<typeof AskHistoryEntrySchema>;
+export type AskSession = z.infer<typeof AskSessionSchema>;
+export type AskTurn = z.infer<typeof AskTurnSchema>;
+export type AskExport = z.infer<typeof AskExportSchema>;
+export type AskSessionBundle = z.infer<typeof AskSessionBundleSchema>;

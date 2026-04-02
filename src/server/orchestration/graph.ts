@@ -12,6 +12,7 @@ import { createEmptyCanonicalState } from "../agents/run-agent";
 import { runAgentTurn } from "../agents/run-agent";
 import { getStorageAdapter } from "../db";
 import { normalizeFindings } from "../findings/normalize";
+import { scopeFeatureIds, scopeFindingIds } from "./identity";
 import { emitProgressEvent } from "./progress-bus";
 import { AnalysisStateAnnotation } from "./state";
 
@@ -216,6 +217,7 @@ export async function executeAgentNode(
   }
 
   const findings = mergeFindings(
+    workflow.run.id,
     workflow.findings,
     [
       ...(agentName === "security"
@@ -231,7 +233,10 @@ export async function executeAgentNode(
   }).workingMemory;
   const features =
     agentName === "product"
-      ? (((result.output as { features?: AnalysisBundle["features"] }).features ?? []) as AnalysisBundle["features"])
+      ? scopeFeatureIds(
+          workflow.run.id,
+          (((result.output as { features?: AnalysisBundle["features"] }).features ?? []) as AnalysisBundle["features"]),
+        )
       : workflow.features;
 
   const snapshot: MemorySnapshot = {
@@ -255,8 +260,8 @@ export async function executeAgentNode(
   };
 }
 
-function mergeFindings(existing: Finding[], update: Finding[]) {
-  return normalizeFindings([...existing, ...update]);
+function mergeFindings(runId: string, existing: Finding[], update: Finding[]) {
+  return normalizeFindings(scopeFindingIds(runId, [...existing, ...update]));
 }
 
 function crossCritiqueNode(workflow: WorkflowState) {

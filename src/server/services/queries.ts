@@ -1,5 +1,6 @@
 import { getStorageAdapter } from "../db";
 import { createDemoBundle } from "../demo/data";
+import { createDemoAskSessionBundle } from "../demo/council";
 
 export async function listRepositories() {
   const storage = getStorageAdapter();
@@ -50,4 +51,25 @@ export async function getDebateState(runId: string) {
     snapshots: bundle.snapshots,
     latestSummary: bundle.snapshots.at(-1)?.canonicalState,
   };
+}
+
+export async function listAskSessions(limit?: number) {
+  const storage = getStorageAdapter();
+  const sessions = await storage.listAskSessions(limit);
+  return sessions.length > 0 ? sessions : [createDemoAskSessionBundle().session];
+}
+
+export async function getLatestAskSessionBundle(sessionId?: string) {
+  const storage = getStorageAdapter();
+
+  if (sessionId) {
+    return storage.getAskSessionBundle(sessionId);
+  }
+
+  const sessions = await storage.listAskSessions(1);
+  if (sessions.length === 0) {
+    return createDemoAskSessionBundle();
+  }
+
+  return storage.getAskSessionBundle(sessions[0].id);
 }

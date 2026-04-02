@@ -4,10 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  BrainCircuit,
   Bug,
   Cable,
   FileText,
   Github,
+  Layers3,
   LayoutDashboard,
   Lightbulb,
   Settings,
@@ -20,13 +22,15 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/codebase", label: "Codebase Analysis", icon: Layers3 },
+  { href: "/ask", label: "Ask / Council", icon: BrainCircuit },
   { href: "/architecture", label: "Architecture", icon: Cable },
   { href: "/debate", label: "Debate", icon: Activity },
+  { href: "/exports", label: "Exports", icon: FileText },
   { href: "/security", label: "Security", icon: ShieldAlert },
   { href: "/gaps", label: "Gaps", icon: Bug },
   { href: "/features", label: "Features", icon: Lightbulb },
   { href: "/patches", label: "Patches", icon: Wrench },
-  { href: "/report", label: "Report", icon: FileText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -46,9 +50,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <p className="text-xs uppercase tracking-[0.35em] text-cyan-300/80">
                 RepoCouncil
               </p>
-              <p className="text-lg font-semibold text-white">Command Center</p>
+              <p className="text-lg font-semibold text-white">Council Workspace</p>
             </Link>
-            <Badge variant="secondary">MVP</Badge>
+            <Badge variant="secondary">Dual Mode</Badge>
           </div>
 
           <nav className="space-y-1">
@@ -74,10 +78,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="mt-auto rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white">
               <Github className="h-4 w-4 text-cyan-300" />
-              Import posture
+              Product posture
             </div>
             <p className="text-sm text-slate-400">
-              Public GitHub and local zip snapshots are supported in the MVP. Analysis state is durable in Postgres mode and demo-backed otherwise.
+              Codebase analysis and Ask Mode sessions are durable in Postgres deployments and demo-backed otherwise.
             </p>
           </div>
         </aside>

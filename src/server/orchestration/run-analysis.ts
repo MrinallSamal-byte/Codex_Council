@@ -9,8 +9,9 @@ import { runAnalyzerSuite } from "../analyzers";
 import { getStorageAdapter } from "../db";
 import { normalizeFindings } from "../findings/normalize";
 import { buildPatchPlans } from "../patches/planner";
-import { buildMarkdownReport } from "../report/export";
+import { buildMarkdownReport, ensureMarkdownReportArtifact } from "../report/export";
 import { type ToolExecution } from "../db/storage";
+import { scopeFeatureIds, scopeFindingIds } from "./identity";
 import {
   DEBATE_AGENT_ORDER,
   continueDebateWorkflow,
@@ -164,7 +165,9 @@ async function persistAnalyzerOutputs(params: {
 }) {
   const storage = getStorageAdapter();
   const analyzerSuite = await runAnalyzerSuite(params.workspacePath, params.run.id);
-  const normalizedAnalyzerFindings = normalizeFindings(analyzerSuite.findings);
+  const normalizedAnalyzerFindings = normalizeFindings(
+    scopeFindingIds(params.run.id, analyzerSuite.findings),
+  );
   const toolExecutions = buildToolExecutions(
     params.run.id,
     params.workspacePath,
@@ -208,16 +211,9 @@ async function finalizeAnalysis(params: {
   features: AnalysisBundle["features"];
 }) {
   const storage = getStorageAdapter();
-  const normalizedFeatures = params.features.map((feature, index) => ({
-    ...feature,
-    analysisRunId: params.run.id,
-    id: `${feature.id}_${index + 1}`,
-  }));
+  const normalizedFeatures = scopeFeatureIds(params.run.id, params.features);
   const normalizedFindings = normalizeFindings(
-    params.findings.map((finding) => ({
-      ...finding,
-      analysisRunId: params.run.id,
-    })),
+    scopeFindingIds(params.run.id, params.findings),
   );
   const patchPlans = buildPatchPlans(params.run.id, normalizedFindings);
 
@@ -244,6 +240,23 @@ async function finalizeAnalysis(params: {
     createdAt: new Date().toISOString(),
   };
   await storage.saveReport(params.run.id, report);
+  try {
+    await ensureMarkdownReportArtifact({
+      bundle: {
+        ...bundle,
+        features: normalizedFeatures,
+        findings: normalizedFindings,
+        patches: patchPlans,
+        reports: [report],
+      },
+      reportContent: report.content,
+    });
+  } catch (error) {
+    console.error(
+      "[repocouncil:export] Unable to persist markdown artifact:",
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   await storage.updateAnalysisRun(params.run.id, {
     ...params.run,
@@ -363,12 +376,12 @@ async function executeResumedAnalysis(params: {
     const resumedFindingArtifacts = extractFindingArtifacts(params.bundle.turns);
     const resumedFeatureArtifacts =
       params.bundle.features.length > 0
-        ? params.bundle.features
-        : extractFeatureArtifacts(params.bundle.turns);
+        ? scopeFeatureIds(params.bundle.run.id, params.bundle.features)
+        : scopeFeatureIds(params.bundle.run.id, extractFeatureArtifacts(params.bundle.turns));
     const mergedFindings = normalizeFindings([
-      ...params.bundle.findings,
+      ...scopeFindingIds(params.bundle.run.id, params.bundle.findings),
       ...normalizedAnalyzerFindings,
-      ...resumedFindingArtifacts,
+      ...scopeFindingIds(params.bundle.run.id, resumedFindingArtifacts),
     ]);
 
     if (!nextAgent) {

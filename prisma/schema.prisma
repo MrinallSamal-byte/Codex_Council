@@ -74,6 +74,59 @@ enum SnapshotType {
   COMPRESSED
 }
 
+enum AskMode {
+  NORMAL
+  DEBATE
+  DEEP_COUNCIL
+}
+
+enum ModelStrategy {
+  SINGLE
+  MIXED
+  AUTO
+}
+
+enum AnswerStyle {
+  CONCISE
+  BALANCED
+  DETAILED
+}
+
+enum ResponsePriority {
+  SPEED
+  BALANCED
+  QUALITY
+}
+
+enum AskAgentRole {
+  RESEARCHER
+  SKEPTIC
+  STRATEGIST
+  BUILDER
+  CRITIC
+  JUDGE
+  PRODUCT
+  SECURITY
+  UX
+  TEACHER
+  DEVILS_ADVOCATE
+  OPTIMIZER
+}
+
+enum AskRoundType {
+  OPENING
+  CRITIQUE
+  REFINEMENT
+  JUDGMENT
+}
+
+enum AskTurnStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
 enum PatchPlanStatus {
   DRAFT
   REVIEWED
@@ -142,6 +195,39 @@ model AnalysisRun {
   @@map("analysis_runs")
 }
 
+model AskSession {
+  id                String           @id @default(cuid())
+  title             String
+  threadId          String           @unique @map("thread_id")
+  status            AnalysisStatus   @default(PENDING)
+  question          String
+  mode              AskMode
+  agentCount        Int              @map("agent_count")
+  modelStrategy     ModelStrategy    @map("model_strategy")
+  answerStyle       AnswerStyle      @map("answer_style")
+  priority          ResponsePriority
+  showDebateProcess Boolean          @default(true) @map("show_debate_process")
+  finalAnswerOnly   Boolean          @default(false) @map("final_answer_only")
+  webLookupAllowed  Boolean          @default(false) @map("web_lookup_allowed")
+  toolsAllowed      Boolean          @default(false) @map("tools_allowed")
+  maxActiveAgents   Int              @default(2) @map("max_active_agents")
+  requestedModel    String?          @map("requested_model")
+  requestedProvider String?          @map("requested_provider")
+  finalAnswer       String?          @map("final_answer")
+  canonicalSummary  Json?            @map("canonical_summary")
+  metadata          Json?
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  completedAt       DateTime?        @map("completed_at")
+
+  turns             AskTurn[]
+  exports           AskExport[]
+
+  @@index([createdAt])
+  @@index([status, updatedAt])
+  @@map("ask_sessions")
+}
+
 model AgentTurn {
   id           String    @id @default(cuid())
   analysisRunId String   @map("analysis_run_id")
@@ -160,6 +246,29 @@ model AgentTurn {
   @@unique([analysisRunId, turnIndex])
   @@index([analysisRunId, agentName])
   @@map("agent_turns")
+}
+
+model AskTurn {
+  id           String        @id @default(cuid())
+  sessionId    String        @map("session_id")
+  role         AskAgentRole
+  roundIndex   Int           @map("round_index")
+  roundType    AskRoundType  @map("round_type")
+  turnIndex    Int           @map("turn_index")
+  status       AskTurnStatus @default(COMPLETED)
+  model        String
+  provider     String
+  inputSummary String?       @map("input_summary")
+  outputJson   Json          @map("output_json")
+  summaryText  String?       @map("summary_text")
+  metadata     Json?
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  session      AskSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, turnIndex])
+  @@index([sessionId, roundIndex, roundType])
+  @@map("ask_turns")
 }
 
 model Finding {
@@ -294,6 +403,21 @@ model ExportReport {
 
   @@index([analysisRunId, format])
   @@map("export_reports")
+}
+
+model AskExport {
+  id         String     @id @default(cuid())
+  sessionId  String     @map("session_id")
+  title      String
+  format     String
+  content    String
+  metadata   Json?
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  session    AskSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, format])
+  @@map("ask_exports")
 }
 
 model ToolExecution {

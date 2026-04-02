@@ -4,6 +4,13 @@ import { z } from "zod";
 import { env, runtimeCapabilities } from "@/env";
 import type { ModelAttempt, ModelSetting } from "@/lib/contracts/domain";
 
+export type ModelExecutionSetting = Pick<
+  ModelSetting,
+  "provider" | "model" | "temperature" | "maxTokens" | "fallbackModels"
+> & {
+  agentName: string;
+};
+
 let client: OpenAI | null = null;
 
 function getClient() {
@@ -49,7 +56,7 @@ export async function generateStructuredOutput<T>({
   schema: z.ZodSchema<T>;
   systemPrompt: string;
   userPrompt: string;
-  setting: ModelSetting;
+  setting: ModelExecutionSetting;
 }): Promise<{ output: T; model: string; provider: string; attempts: ModelAttempt[] }> {
   const attempts: ModelAttempt[] = [];
   const openRouter = getClient();

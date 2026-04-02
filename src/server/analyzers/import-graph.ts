@@ -43,7 +43,7 @@ export const importGraphAnalyzer: RepoToolAdapter<
       const nodeKey = buildGraphNodeKey(file);
 
       nodes.push({
-        id: `node_${slugify(file)}`,
+        id: `node_${slugify(input.analysisRunId)}_${slugify(file)}`,
         analysisRunId: input.analysisRunId,
         nodeKey,
         type: inferNodeType(file),
@@ -82,7 +82,7 @@ export const importGraphAnalyzer: RepoToolAdapter<
 
         const targetNodeKey = buildGraphNodeKey(target);
         edges.push({
-          id: `edge_${slugify(`${file}_${target}`)}`,
+          id: `edge_${slugify(input.analysisRunId)}_${slugify(`${file}_${target}`)}`,
           analysisRunId: input.analysisRunId,
           edgeKey: `${nodeKey}->${targetNodeKey}:imports`,
           sourceNodeKey: nodeKey,

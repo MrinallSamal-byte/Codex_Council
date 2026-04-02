@@ -44,6 +44,7 @@ export function useLiveAnalysisBundle(initialBundle: AnalysisBundle | null) {
         type: string;
         message?: string;
         percent?: number;
+        error?: string;
         bundle?: AnalysisBundle;
         nodes?: AnalysisBundle["graph"]["nodes"];
         edges?: AnalysisBundle["graph"]["edges"];
@@ -78,6 +79,15 @@ export function useLiveAnalysisBundle(initialBundle: AnalysisBundle | null) {
         setBundle(payload.bundle);
         setProgress({
           message: "Analysis complete",
+          percent: 100,
+        });
+        eventSource.close();
+      }
+
+      if (payload.type === "analysis.failed") {
+        await refreshBundle(bundle.run.id);
+        setProgress({
+          message: payload.error ?? "Analysis failed",
           percent: 100,
         });
         eventSource.close();

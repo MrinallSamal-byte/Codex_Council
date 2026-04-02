@@ -39,3 +39,15 @@ services:
         value: /tmp/repocouncil/workspaces
         scope: RUN_TIME
         type: general
+      - key: EXPORT_STORAGE_ROOT
+        value: /tmp/repocouncil/exports
+        scope: RUN_TIME
+        type: general
+      - key: ANALYSIS_MAX_CONCURRENCY
+        value: "1"
+        scope: RUN_TIME
+        type: general
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=768
+        scope: RUN_TIME
+        type: general

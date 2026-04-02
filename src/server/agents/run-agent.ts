@@ -68,7 +68,12 @@ export async function runAgentTurn(params: {
         : [];
 
     return {
-      output: buildFallbackAgentOutput(params.agentName, params.analyzerSuite, params.workingMemory),
+      output: buildFallbackAgentOutput(
+        params.agentName,
+        params.analyzerSuite,
+        params.workingMemory,
+        params.run.id,
+      ),
       model: `${params.modelSetting.model} (fallback)`,
       provider: params.modelSetting.provider,
       attempts: [
@@ -88,6 +93,7 @@ function buildFallbackAgentOutput(
   agentName: AgentName,
   analyzerSuite: AnalyzerSuiteResult,
   workingMemory: WorkingMemory,
+  runId: string,
 ) {
   const securityFindings = analyzerSuite.findings.filter((finding) => finding.category === "security");
   const implementationFindings = analyzerSuite.findings.filter(
@@ -160,7 +166,7 @@ function buildFallbackAgentOutput(
     return ProductAgentOutputSchema.parse({
       summary:
         "The most valuable near-term features improve operator visibility and complete already signaled workflows without expanding the platform into a new product category.",
-      features: buildHeuristicFeatures(analyzerSuite),
+      features: buildHeuristicFeatures(analyzerSuite, runId),
       evidence: analyzerSuite.graph.nodes.slice(0, 5).map((node) => ({
         filePath: node.filePath ?? undefined,
         nodeKey: node.nodeKey,
@@ -191,13 +197,16 @@ function buildFallbackAgentOutput(
   });
 }
 
-function buildHeuristicFeatures(analyzerSuite: AnalyzerSuiteResult): FeatureSuggestion[] {
+function buildHeuristicFeatures(
+  analyzerSuite: AnalyzerSuiteResult,
+  runId: string,
+): FeatureSuggestion[] {
   const modules = analyzerSuite.graph.nodes.map((node) => node.label).slice(0, 6);
 
   return [
     {
-      id: "feature_auto_1",
-      analysisRunId: "pending",
+      id: `feature_auto_${runId}_1`,
+      analysisRunId: runId,
       title: "Operational Alerts",
       value: "Proactively surfaces failures before support tickets accumulate.",
       rationale: "The repository already has route and service flows that can emit signal-rich health events.",
@@ -208,8 +217,8 @@ function buildHeuristicFeatures(analyzerSuite: AnalyzerSuiteResult): FeatureSugg
       dependencyImpact: "Requires event emission and a dashboard view.",
     },
     {
-      id: "feature_auto_2",
-      analysisRunId: "pending",
+      id: `feature_auto_${runId}_2`,
+      analysisRunId: runId,
       title: "Saved Operator Views",
       value: "Speeds repeated admin workflows by preserving filters and sort state.",
       rationale: "The current graph shows admin-facing pages and route handlers that can support persistent operator views.",
@@ -220,8 +229,8 @@ function buildHeuristicFeatures(analyzerSuite: AnalyzerSuiteResult): FeatureSugg
       dependencyImpact: "Adds a small persistence model and settings UI.",
     },
     {
-      id: "feature_auto_3",
-      analysisRunId: "pending",
+      id: `feature_auto_${runId}_3`,
+      analysisRunId: runId,
       title: "Audit Export",
       value: "Makes compliance and incident follow-up easier for admins.",
       rationale: "The codebase already collects enough operational information to justify structured export workflows.",
@@ -232,8 +241,8 @@ function buildHeuristicFeatures(analyzerSuite: AnalyzerSuiteResult): FeatureSugg
       dependencyImpact: "Touches reporting and auth layers.",
     },
     {
-      id: "feature_auto_4",
-      analysisRunId: "pending",
+      id: `feature_auto_${runId}_4`,
+      analysisRunId: runId,
       title: "Workflow Completion for Placeholder UI Actions",
       value: "Eliminates dead-end operator interactions and improves trust in the admin surface.",
       rationale: "Implementation analyzers identified user-visible gaps that are already partially designed.",
@@ -244,8 +253,8 @@ function buildHeuristicFeatures(analyzerSuite: AnalyzerSuiteResult): FeatureSugg
       dependencyImpact: "Completes existing route and service contracts.",
     },
     {
-      id: "feature_auto_5",
-      analysisRunId: "pending",
+      id: `feature_auto_${runId}_5`,
+      analysisRunId: runId,
       title: "Executive Risk Overview",
       value: "Summarizes operational and security posture directly in the product dashboard.",
       rationale: "The graph and findings already expose data points suitable for a lightweight overview surface.",

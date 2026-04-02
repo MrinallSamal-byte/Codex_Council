@@ -2,6 +2,7 @@
 
 FROM node:20-bookworm-slim AS base
 WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates openssl tini \
@@ -9,7 +10,8 @@ RUN apt-get update \
 
 FROM base AS deps
 COPY package.json package-lock.json ./
-RUN npm ci
+COPY prisma ./prisma
+RUN npm ci --no-audit --no-fund
 
 FROM base AS builder
 ENV NODE_ENV=production
@@ -19,7 +21,8 @@ RUN npm run build
 
 FROM base AS prod-deps
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY prisma ./prisma
+RUN npm ci --omit=dev --no-audit --no-fund
 
 FROM base AS runner
 ENV NODE_ENV=production

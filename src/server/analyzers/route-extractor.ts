@@ -49,7 +49,7 @@ export const routeExtractor: RepoToolAdapter<
         const nodeKey = buildGraphNodeKey(file);
         pageNodeKeys.set(file, nodeKey);
         nodes.push({
-          id: `node_${slugify(file)}`,
+          id: `node_${slugify(input.analysisRunId)}_${slugify(file)}`,
           analysisRunId: input.analysisRunId,
           nodeKey,
           type: "page",
@@ -76,7 +76,7 @@ export const routeExtractor: RepoToolAdapter<
 
       routeNodeKeys.set(routePath, routeNodeKey);
       nodes.push({
-        id: `node_${slugify(file)}`,
+        id: `node_${slugify(input.analysisRunId)}_${slugify(file)}`,
         analysisRunId: input.analysisRunId,
         nodeKey: routeNodeKey,
         type: "route",
@@ -112,7 +112,7 @@ export const routeExtractor: RepoToolAdapter<
         }
 
         edges.push({
-          id: `edge_${slugify(`${pageNodeKey}-${routeNodeKey}`)}`,
+          id: `edge_${slugify(input.analysisRunId)}_${slugify(`${pageNodeKey}-${routeNodeKey}`)}`,
           analysisRunId: input.analysisRunId,
           edgeKey: `${pageNodeKey}->${routeNodeKey}:fetches`,
           sourceNodeKey: pageNodeKey,

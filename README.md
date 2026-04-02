@@ -39,6 +39,9 @@ Optional:
 - `OPENROUTER_API_KEY`: enables live model calls through OpenRouter
 - `NEXT_PUBLIC_APP_URL`: defaults to `http://localhost:3000`
 - `REPO_STORAGE_ROOT`: defaults to `.repocouncil/workspaces` locally and `/tmp/repocouncil/workspaces` in production
+- `EXPORT_STORAGE_ROOT`: defaults to `.repocouncil/exports` locally and `/tmp/repocouncil/exports` in production
+- `ANALYSIS_MAX_CONCURRENCY`: defaults to `1` for modest cloud instances
+- `NODE_OPTIONS`: defaults to `--max-old-space-size=768` in the provided container configs
 - `ENABLE_SEMGREP=true`: enables Semgrep adapter if the `semgrep` binary is installed
 - `DEMO_MODE=false`: disables demo defaults
 
@@ -124,4 +127,11 @@ Recommended local checks:
 npm run lint
 npm run typecheck
 npm run build
+```
+
+Production-style runtime checks:
+
+```bash
+sh deployment/scripts/post-deploy-check.sh http://127.0.0.1:3000
+node deployment/scripts/verify-deployed-analysis.mjs http://127.0.0.1:3000
 ```

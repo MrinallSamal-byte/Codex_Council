@@ -20,5 +20,10 @@ export async function GET(
     turnsCount: bundle.turns.length,
     snapshotsCount: bundle.snapshots.length,
     reportsCount: bundle.reports.length,
+    canResume:
+      bundle.run.status !== "completed" &&
+      !bundle.turns.some((turn) => turn.agentName === "judge"),
+    latestTurnAt: bundle.turns.at(-1)?.createdAt ?? null,
+    latestSnapshotAt: bundle.snapshots.at(-1)?.createdAt ?? null,
   });
 }

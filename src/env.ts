@@ -19,6 +19,9 @@ const envSchema = z.object({
   REPO_STORAGE_ROOT: z.string().default(defaultRepoStorageRoot),
   EXPORT_STORAGE_ROOT: z.string().default(defaultExportStorageRoot),
   ANALYSIS_MAX_CONCURRENCY: z.coerce.number().int().min(1).default(1),
+  ASK_MAX_CONCURRENCY: z.coerce.number().int().min(1).default(1),
+  ASK_MAX_ACTIVE_AGENTS: z.coerce.number().int().min(1).max(6).default(2),
+  ASK_MAX_PARTICIPANTS: z.coerce.number().int().min(1).max(6).default(6),
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   ENABLE_SEMGREP: z
     .string()
@@ -44,6 +47,9 @@ export const env = envSchema.parse({
   REPO_STORAGE_ROOT: process.env.REPO_STORAGE_ROOT,
   EXPORT_STORAGE_ROOT: process.env.EXPORT_STORAGE_ROOT,
   ANALYSIS_MAX_CONCURRENCY: process.env.ANALYSIS_MAX_CONCURRENCY,
+  ASK_MAX_CONCURRENCY: process.env.ASK_MAX_CONCURRENCY,
+  ASK_MAX_ACTIVE_AGENTS: process.env.ASK_MAX_ACTIVE_AGENTS,
+  ASK_MAX_PARTICIPANTS: process.env.ASK_MAX_PARTICIPANTS,
   LOG_LEVEL: process.env.LOG_LEVEL,
   ENABLE_SEMGREP: process.env.ENABLE_SEMGREP,
   ENABLE_CODEQL: process.env.ENABLE_CODEQL,
@@ -58,5 +64,8 @@ export const runtimeCapabilities = {
   codeQlEnabled: env.ENABLE_CODEQL,
   demoMode: env.DEMO_MODE,
   analysisMaxConcurrency: env.ANALYSIS_MAX_CONCURRENCY,
+  askMaxConcurrency: env.ASK_MAX_CONCURRENCY,
+  askMaxActiveAgents: env.ASK_MAX_ACTIVE_AGENTS,
+  askMaxParticipants: env.ASK_MAX_PARTICIPANTS,
   logLevel: env.LOG_LEVEL,
 } as const;

@@ -41,7 +41,7 @@ export const todoFinder: RepoToolAdapter<
         }
 
         findings.push({
-          id: `todo_${slugify(`${file}_${index}`)}`,
+          id: `todo_${slugify(input.analysisRunId)}_${slugify(`${file}_${index}`)}`,
           analysisRunId: input.analysisRunId,
           category: "implementation",
           severity: "medium",

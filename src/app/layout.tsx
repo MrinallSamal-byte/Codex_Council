@@ -19,7 +19,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "RepoCouncil",
-  description: "Multi-agent codebase intelligence command center",
+  description: "Multi-agent workspace for code intelligence and debated answers",
 };
 
 export default function RootLayout({
